@@ -56,10 +56,10 @@ def _function_declarations(mode: str) -> list[dict[str, Any]]:
             "parameters": {
                 "type": "OBJECT",
                 "properties": {
-                    "query": {"type": "STRING"},
+                    "key": {"type": "STRING"},
                     "limit": {"type": "NUMBER"},
                 },
-                "required": ["query"],
+                "required": ["key"],
             },
         },
     ]
@@ -262,7 +262,7 @@ def _dispatch_tool(
         )
     if name == "get_lamindb_skill":
         return get_lamindb_skill(
-            query=str(args.get("query", "")),
+            key=str(args.get("key", "")),
             limit=int(args.get("limit", 5)),
             run_uid=run_context.run_uid,
         )

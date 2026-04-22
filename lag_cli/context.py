@@ -39,31 +39,27 @@ def get_local_skill(
 
 
 def _collect_db_matches(
-    db: Any, query: str, limit: int
+    db: Any, key: str, limit: int
 ) -> tuple[list[dict[str, str]], list[str]]:
-    query_lower = query.lower()
+    query_lower = key.lower()
     results: list[dict[str, str]] = []
     warnings: list[str] = []
 
     try:
-        transforms = db.Transform.filter().all()
-        for transform in transforms:
-            name = str(getattr(transform, "name", "") or "")
-            desc = str(getattr(transform, "description", "") or "")
-            haystack = f"{name}\n{desc}".lower()
-            if query_lower in haystack:
-                results.append(
-                    {
-                        "type": "transform",
-                        "uid": str(transform.uid),
-                        "name": name,
-                        "description": desc[:1000],
-                    }
-                )
-                if len(results) >= limit:
-                    break
+        transform = db.Transform.get(key=key)
+        description = str(getattr(transform, "description", "") or "")
+        results.append(
+            {
+                "type": "transform",
+                "uid": str(transform.uid),
+                "key": str(getattr(transform, "key", "") or ""),
+                "description": description[:1000],
+            }
+        )
     except Exception as exc:
-        warnings.append(f"Transform lookup failed: {exc}")
+        message = str(exc)
+        if "does not exist" not in message.lower():
+            warnings.append(f"Transform lookup failed: {exc}")
 
     try:
         if len(results) < limit:
@@ -89,7 +85,7 @@ def _collect_db_matches(
     return results, warnings
 
 
-def get_lamindb_skill(*, query: str, run_uid: str, limit: int = 5) -> dict[str, Any]:
+def get_lamindb_skill(*, key: str, run_uid: str, limit: int = 5) -> dict[str, Any]:
     """Best-effort lookup from the current instance, then biomed-skills fallback."""
     current_slug: str | None = None
     warnings: list[str] = []
@@ -118,7 +114,7 @@ def get_lamindb_skill(*, query: str, run_uid: str, limit: int = 5) -> dict[str, 
             continue
 
         instance_results, instance_warnings = _collect_db_matches(
-            db=db, query=query, limit=limit
+            db=db, key=key, limit=limit
         )
         warnings.extend(instance_warnings)
         results.extend(instance_results)
@@ -127,10 +123,10 @@ def get_lamindb_skill(*, query: str, run_uid: str, limit: int = 5) -> dict[str, 
 
     payload = {
         "run_uid": run_uid,
-        "query": query,
+        "key": key,
         "results": results,
         "searched_instances": searched_instances,
-        "message": f"Found {len(results)} LaminDB matches for '{query}'.",
+        "message": f"Found {len(results)} LaminDB matches for '{key}'.",
         "warnings": warnings,
     }
     return payload
