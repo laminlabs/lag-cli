@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import re
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import requests
@@ -16,7 +18,6 @@ from .writer import (
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from pathlib import Path
 
     from .run_context import RunContext
 
@@ -147,6 +148,29 @@ def _extract_text(parts: list[dict[str, Any]]) -> str:
     return "\n".join(chunks).strip()
 
 
+def _looks_like_wrapper_runner(code: str, existing_generated_files: list[str]) -> bool:
+    text = code.lower()
+    if "subprocess.run" not in text:
+        return False
+    if "python" not in text and "sys.executable" not in text:
+        return False
+    if "artifact(" in text:
+        return False
+
+    py_target_match = re.search(r"""["'][^"']+\.py["']""", code)
+    if not py_target_match:
+        return False
+
+    existing_names = {
+        Path(path_str).name
+        for path_str in existing_generated_files
+        if path_str.endswith(".py")
+    }
+    if not existing_names:
+        return True
+    return any(name in code for name in existing_names)
+
+
 def _post_generate_content(
     *,
     url: str,
@@ -211,6 +235,7 @@ def _dispatch_tool(
     args: dict[str, Any],
     run_context: RunContext,
     default_output_file: Path,
+    existing_generated_files: list[str],
 ) -> dict[str, Any]:
     if name == "get_local_skill":
         return get_local_skill(
@@ -226,8 +251,20 @@ def _dispatch_tool(
         )
     if name == "write_python_script":
         filename = str(args.get("filename") or default_output_file)
+        code = str(args.get("code", ""))
+        if run_context.mode == "do" and _looks_like_wrapper_runner(
+            code, existing_generated_files
+        ):
+            return {
+                "status": "error",
+                "message": (
+                    "Rejected wrapper runner script. In do mode, write the task directly "
+                    "instead of invoking another generated script via subprocess."
+                ),
+                "run_uid": run_context.run_uid,
+            }
         return write_python_script(
-            code=str(args.get("code", "")),
+            code=code,
             filename=filename,
             run_uid=run_context.run_uid,
             track_outputs=run_context.track_outputs,
@@ -345,6 +382,7 @@ def run_agent(
                 args=args,
                 run_context=run_context,
                 default_output_file=output_file,
+                existing_generated_files=generated_files,
             )
             generated = result.get("file")
             if isinstance(generated, str) and generated:
