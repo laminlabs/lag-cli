@@ -9,23 +9,12 @@ from dotenv import load_dotenv
 
 from .agent import run_agent
 from .do_executor import execute_plan, execute_runnable_paths, find_plan_file
+from .output_saver import save_generated_artifact, save_generated_tool_files
 from .run_context import RunContext, create_run_uid
 
 
 def _progress(message: str) -> None:
     click.echo(f"→ {message}")
-
-
-def _save_generated_artifact(path_str: str | None, run_uid: str) -> None:
-    if not path_str:
-        return
-    path = Path(path_str)
-    if not path.exists():
-        return
-    ln.Artifact(
-        str(path),
-        description=f"Generated analysis output (run_uid={run_uid})",
-    ).save()
 
 
 def _flow_run_agent_mode(
@@ -66,14 +55,22 @@ def _flow_run_agent_mode(
     )
 
     generated_file = result.get("generated_file")
-    _save_generated_artifact(
-        generated_file if isinstance(generated_file, str) else None,
-        run_uid,
-    )
+    generated_files = [
+        path_str
+        for path_str in result.get("generated_files", [])
+        if isinstance(path_str, str) and path_str
+    ]
+    if mode == "plan":
+        save_generated_tool_files(generated_files)
+    else:
+        save_generated_artifact(
+            generated_file if isinstance(generated_file, str) else None,
+            run_uid,
+        )
     return {
         "run_uid": run_uid,
         "generated_path": generated_file if isinstance(generated_file, str) else None,
-        "generated_paths": ",".join(result.get("generated_files", [])),
+        "generated_paths": ",".join(generated_files),
         "final_text": str(result.get("final_text", "") or "").strip(),
     }
 
