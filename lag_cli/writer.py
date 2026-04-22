@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import shutil
-import textwrap
 from pathlib import Path
 from typing import Any
 
@@ -9,51 +8,24 @@ import nbformat
 
 
 def _ensure_tracked_python_code(code: str) -> str:
-    if "ln.track(" in code and "ln.finish(" in code:
-        return code
-
-    indented = textwrap.indent(code.rstrip() + "\n", "    ")
-    return (
-        "import lamindb as ln\n"
-        "from pathlib import Path\n\n"
-        "ln.track()\n"
-        "_before_files = {p.resolve() for p in Path('.').rglob('*') if p.is_file()}\n\n"
-        "try:\n"
-        f"{indented}"
-        "finally:\n"
-        "    _after_files = {p.resolve() for p in Path('.').rglob('*') if p.is_file()}\n"
-        "    for _path in sorted(_after_files - _before_files):\n"
-        "        if _path.name in {'trace.txt', 'trace_exec.txt'}:\n"
-        "            continue\n"
-        "        try:\n"
-        "            ln.Artifact(str(_path), description='Auto-tracked generated output').save()\n"
-        "        except Exception as _exc:\n"
-        "            print(f'Warning: failed to track {_path}: {_exc}')\n"
-        "    ln.finish()\n"
-    )
+    text = code.rstrip() + "\n"
+    pieces: list[str] = []
+    if "import lamindb as ln" not in text:
+        pieces.append("import lamindb as ln\n")
+    if "ln.track(" not in text:
+        pieces.append("ln.track()\n")
+    pieces.append(text)
+    if "ln.finish(" not in text:
+        pieces.append("\nln.finish()\n")
+    return "".join(pieces)
 
 
 def _tracking_prologue_cell() -> str:
-    return (
-        "import lamindb as ln\n"
-        "from pathlib import Path\n\n"
-        "ln.track()\n"
-        "_before_files = {p.resolve() for p in Path('.').rglob('*') if p.is_file()}\n"
-    )
+    return "import lamindb as ln\n\nln.track()\n"
 
 
 def _tracking_epilogue_cell() -> str:
-    return (
-        "_after_files = {p.resolve() for p in Path('.').rglob('*') if p.is_file()}\n"
-        "for _path in sorted(_after_files - _before_files):\n"
-        "    if _path.name in {'trace.txt', 'trace_exec.txt'}:\n"
-        "        continue\n"
-        "    try:\n"
-        "        ln.Artifact(str(_path), description='Auto-tracked generated output').save()\n"
-        "    except Exception as _exc:\n"
-        "        print(f'Warning: failed to track {_path}: {_exc}')\n"
-        "ln.finish()\n"
-    )
+    return "ln.finish()\n"
 
 
 def write_python_script(

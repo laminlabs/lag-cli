@@ -10,11 +10,22 @@ from dotenv import load_dotenv
 from .agent import run_agent
 from .do_executor import execute_plan, execute_runnable_paths, find_plan_file
 from .run_context import RunContext, create_run_uid
-from .tracing import register_trace_and_outputs, save_trace_files
 
 
 def _progress(message: str) -> None:
     click.echo(f"→ {message}")
+
+
+def _save_generated_artifact(path_str: str | None, run_uid: str) -> None:
+    if not path_str:
+        return
+    path = Path(path_str)
+    if not path.exists():
+        return
+    ln.Artifact(
+        str(path),
+        description=f"Generated analysis output (run_uid={run_uid})",
+    ).save()
 
 
 def _flow_run_agent_mode(
@@ -54,23 +65,14 @@ def _flow_run_agent_mode(
         progress_callback=_progress,
     )
 
-    trace_txt_path = Path("trace.txt")
-    save_trace_files(
-        trace_payload=result,
-        trace_txt_path=trace_txt_path,
-    )
-
     generated_file = result.get("generated_file")
-    generated_path = Path(generated_file) if isinstance(generated_file, str) else None
-    register_trace_and_outputs(
-        run_uid=run_uid,
-        trace_txt_path=trace_txt_path,
-        generated_file=generated_path,
+    _save_generated_artifact(
+        generated_file if isinstance(generated_file, str) else None,
+        run_uid,
     )
     return {
         "run_uid": run_uid,
-        "trace_path": str(trace_txt_path),
-        "generated_path": str(generated_path) if generated_path else None,
+        "generated_path": generated_file if isinstance(generated_file, str) else None,
         "generated_paths": ",".join(result.get("generated_files", [])),
         "final_text": str(result.get("final_text", "") or "").strip(),
     }
@@ -88,19 +90,8 @@ def _flow_execute_plan(
         plan_file=plan_file,
         run_uid=run_uid,
     )
-    trace_txt_path = Path("trace.txt")
-    save_trace_files(
-        trace_payload=result,
-        trace_txt_path=trace_txt_path,
-    )
-    register_trace_and_outputs(
-        run_uid=run_uid,
-        trace_txt_path=trace_txt_path,
-        generated_file=None,
-    )
     return {
         "run_uid": run_uid,
-        "trace_path": str(trace_txt_path),
         "plan_path": str(plan_file),
         "final_text": str(result.get("final_text", "")),
     }
@@ -124,19 +115,8 @@ def _flow_execute_generated(
         run_uid=run_uid,
         source="generated_outputs",
     )
-    trace_txt_path = Path("trace_exec.txt")
-    save_trace_files(
-        trace_payload=result,
-        trace_txt_path=trace_txt_path,
-    )
-    register_trace_and_outputs(
-        run_uid=run_uid,
-        trace_txt_path=trace_txt_path,
-        generated_file=None,
-    )
     return {
         "run_uid": run_uid,
-        "trace_path": str(trace_txt_path),
         "final_text": str(result.get("final_text", "")),
     }
 
@@ -190,7 +170,6 @@ def main(
             track_outputs=not no_track,
         )
         click.echo(f"run_uid={outcome['run_uid']}")
-        click.echo(f"trace={outcome['trace_path']}")
         if outcome["generated_path"]:
             click.echo(f"generated={outcome['generated_path']}")
         if outcome["final_text"]:
@@ -205,7 +184,6 @@ def main(
             plan_file=chosen_plan_file,
         )
         click.echo(f"run_uid={outcome['run_uid']}")
-        click.echo(f"trace={outcome['trace_path']}")
         click.echo(f"plan={outcome['plan_path']}")
         click.echo(str(outcome["final_text"]))
         return
@@ -219,7 +197,6 @@ def main(
         track_outputs=not no_track,
     )
     click.echo(f"run_uid={outcome['run_uid']}")
-    click.echo(f"trace={outcome['trace_path']}")
     if outcome["generated_path"]:
         click.echo(f"generated={outcome['generated_path']}")
     if outcome["generated_paths"]:
@@ -228,7 +205,6 @@ def main(
             generated_paths_csv=str(outcome["generated_paths"]),
         )
         click.echo(f"exec_run_uid={exec_outcome['run_uid']}")
-        click.echo(f"exec_trace={exec_outcome['trace_path']}")
         click.echo(str(exec_outcome["final_text"]))
     if outcome["final_text"]:
         click.echo("\nFinal response:\n")

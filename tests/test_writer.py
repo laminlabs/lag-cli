@@ -17,6 +17,7 @@ def test_write_python_script(tmp_path: Path) -> None:
     text = out.read_text(encoding="utf-8")
     assert "ln.track()" in text
     assert "ln.finish()" in text
+    assert "_before_files" not in text
 
 
 def test_write_jupyter_notebook(tmp_path: Path) -> None:
