@@ -15,6 +15,7 @@ from .output_saver import save_generated_tool_files
 from .run_context import RunContext, create_run_uid
 
 _STEP_PATTERN = re.compile(r"^step (\d+):\s*(.*)$")
+_GEMINI_ATTEMPT_PATTERN = re.compile(r"^gemini request attempt (\d+)/(\d+)$")
 _COLOR_ENABLED = os.getenv("NO_COLOR") is None
 
 
@@ -60,7 +61,9 @@ def _progress(message: str) -> None:
         _secho(message.removeprefix("prompt: "), fg="cyan")
         return
     if message.startswith("gemini request attempt"):
-        _secho(f"→ {message}", fg="magenta")
+        attempt_match = _GEMINI_ATTEMPT_PATTERN.match(message)
+        if attempt_match is not None and int(attempt_match.group(1)) > 1:
+            _secho(f"→ {message}", fg="magenta")
         return
     if message.startswith("gemini transient status"):
         _secho(f"→ {message}", fg="yellow")
@@ -78,10 +81,10 @@ def _progress(message: str) -> None:
         return
 
     step, detail = step_match.groups()
-    _secho(f"→ step {step}: ", nl=False, fg="black")
     if detail.startswith("waiting for model response"):
-        _secho(detail, fg="blue")
-    elif detail.startswith("model text: "):
+        return
+    _secho(f"→ step {step}: ", nl=False, fg="black")
+    if detail.startswith("model text: "):
         _secho("model text: ", nl=False, fg="blue")
         _secho(detail.removeprefix("model text: "))
     elif detail.startswith("tool call -> "):
