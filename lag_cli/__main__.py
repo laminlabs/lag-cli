@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 import click
@@ -12,9 +13,87 @@ from .do_executor import execute_plan, execute_runnable_paths, find_plan_file
 from .output_saver import save_generated_tool_files
 from .run_context import RunContext, create_run_uid
 
+_STEP_PATTERN = re.compile(r"^step (\d+):\s*(.*)$")
+_COLOR_ENABLED = os.getenv("NO_COLOR") is None
+
+
+def _secho(
+    message: str,
+    *,
+    fg: str | None = None,
+    bold: bool = False,
+    nl: bool = True,
+) -> None:
+    click.secho(message, fg=fg, bold=bold, nl=nl, color=_COLOR_ENABLED)
+
+
+def _echo_info(message: str) -> None:
+    _secho(f"→ {message}", fg="bright_black")
+
+
+def _echo_success(message: str) -> None:
+    _secho(f"✓ {message}", fg="green")
+
+
+def _echo_warning(message: str) -> None:
+    _secho(f"! {message}", fg="yellow")
+
+
+def _echo_section(title: str) -> None:
+    _secho(f"\n[{title}]", fg="bright_cyan", bold=True)
+
+
+def _echo_key_value(key: str, value: str, *, value_color: str = "white") -> None:
+    _secho("→ ", nl=False, fg="bright_black")
+    _secho(f"{key}=", nl=False, fg="bright_black")
+    _secho(value, fg=value_color)
+
 
 def _progress(message: str) -> None:
-    click.echo(f"→ {message}")
+    if message.startswith("mode="):
+        _echo_info(message)
+        return
+    if message.startswith("prompt: "):
+        _secho("→ prompt: ", nl=False, fg="bright_black")
+        _secho(message.removeprefix("prompt: "), fg="cyan")
+        return
+    if message.startswith("gemini request attempt"):
+        _secho(f"→ {message}", fg="magenta")
+        return
+    if message.startswith("gemini transient status"):
+        _secho(f"→ {message}", fg="yellow")
+        return
+    if message.startswith("gemini request failed"):
+        _secho(f"→ {message}", fg="red")
+        return
+    if message == "model finished without further tool calls":
+        _secho(f"→ {message}", fg="green")
+        return
+
+    step_match = _STEP_PATTERN.match(message)
+    if step_match is None:
+        _echo_info(message)
+        return
+
+    step, detail = step_match.groups()
+    _secho(f"→ step {step}: ", nl=False, fg="bright_black")
+    if detail.startswith("waiting for model response"):
+        _secho(detail, fg="blue")
+    elif detail.startswith("model text: "):
+        _secho("model text: ", nl=False, fg="blue")
+        _secho(detail.removeprefix("model text: "), fg="white")
+    elif detail.startswith("tool call -> "):
+        _secho("tool call -> ", nl=False, fg="magenta")
+        _secho(detail.removeprefix("tool call -> "), fg="white")
+    elif detail.startswith("wrote file "):
+        _secho(detail, fg="green")
+    elif detail.startswith("tool result status="):
+        status = detail.removeprefix("tool result status=")
+        color = "green" if status == "success" else "yellow"
+        _secho("tool result status=", nl=False, fg="bright_black")
+        _secho(status, fg=color)
+    else:
+        _secho(detail, fg="white")
 
 
 def _parse_generated_paths(generated_paths_csv: str) -> list[Path]:
@@ -31,10 +110,11 @@ def _print_generated_tool_contents(paths: list[Path]) -> None:
         if path in seen or not path.exists():
             continue
         seen.add(path)
-        click.echo(f"\n--- generated tool: {path} ---")
+        _echo_section(f"Generated Tool {path.name}")
+        _secho(str(path), fg="bright_black")
         content = path.read_text(encoding="utf-8")
-        click.echo(content)
-        click.echo("--- end generated tool ---")
+        _secho(content, fg="white")
+        _secho("--- end generated tool ---", fg="bright_black")
 
 
 def _flow_run_agent_mode(
@@ -176,6 +256,9 @@ def main(
 ) -> None:
     """LAG CLI."""
     if plan_mode:
+        _echo_section("User Input")
+        _echo_key_value("prompt", prompt, value_color="cyan")
+        _echo_key_value("mode", "plan", value_color="bright_cyan")
         outcome = _flow_run_agent_mode(
             mode="plan",
             prompt=prompt,
@@ -184,25 +267,37 @@ def main(
             output_format=output_format,
             track_outputs=not no_track,
         )
-        click.echo(f"run_uid={outcome['run_uid']}")
+        _echo_section("Run")
+        _echo_key_value("run_uid", str(outcome["run_uid"]), value_color="green")
         if outcome["generated_path"]:
-            click.echo(f"generated={outcome['generated_path']}")
+            _echo_key_value(
+                "generated",
+                str(outcome["generated_path"]),
+                value_color="bright_magenta",
+            )
         if outcome["final_text"]:
-            click.echo("\nFinal response:\n")
-            click.echo(str(outcome["final_text"]))
+            _echo_section("Model Output")
+            _secho(str(outcome["final_text"]), fg="white")
         return
 
     chosen_plan_file = find_plan_file(plan_file)
     if chosen_plan_file is not None:
+        _echo_section("User Input")
+        _echo_key_value("prompt", prompt, value_color="cyan")
+        _echo_key_value("mode", "execute-plan", value_color="bright_cyan")
         outcome = _flow_execute_plan(
             prompt=prompt,
             plan_file=chosen_plan_file,
         )
-        click.echo(f"run_uid={outcome['run_uid']}")
-        click.echo(f"plan={outcome['plan_path']}")
-        click.echo(str(outcome["final_text"]))
+        _echo_section("Run")
+        _echo_key_value("run_uid", str(outcome["run_uid"]), value_color="green")
+        _echo_key_value("plan", str(outcome["plan_path"]), value_color="magenta")
+        _secho(str(outcome["final_text"]), fg="white")
         return
 
+    _echo_section("User Input")
+    _echo_key_value("prompt", prompt, value_color="cyan")
+    _echo_key_value("mode", "do", value_color="bright_cyan")
     outcome = _flow_run_agent_mode(
         mode="do",
         prompt=prompt,
@@ -211,9 +306,14 @@ def main(
         output_format="py",
         track_outputs=not no_track,
     )
-    click.echo(f"run_uid={outcome['run_uid']}")
+    _echo_section("Run")
+    _echo_key_value("run_uid", str(outcome["run_uid"]), value_color="green")
     if outcome["generated_path"]:
-        click.echo(f"generated={outcome['generated_path']}")
+        _echo_key_value(
+            "generated",
+            str(outcome["generated_path"]),
+            value_color="bright_magenta",
+        )
     if outcome["generated_paths"]:
         generated_paths_csv = str(outcome["generated_paths"])
         generated_paths = _parse_generated_paths(generated_paths_csv)
@@ -227,13 +327,17 @@ def main(
                 prompt=prompt,
                 generated_paths_csv=generated_paths_csv,
             )
-            click.echo(f"exec_run_uid={exec_outcome['run_uid']}")
-            click.echo(str(exec_outcome["final_text"]))
+            _echo_key_value(
+                "exec_run_uid",
+                str(exec_outcome["run_uid"]),
+                value_color="green",
+            )
+            _secho(str(exec_outcome["final_text"]), fg="white")
         else:
-            click.echo("Skipped execution of newly generated tools.")
+            _echo_warning("Skipped execution of newly generated tools.")
     if outcome["final_text"]:
-        click.echo("\nFinal response:\n")
-        click.echo(str(outcome["final_text"]))
+        _echo_section("Model Output")
+        _secho(str(outcome["final_text"]), fg="white")
 
 
 if __name__ == "__main__":

@@ -26,6 +26,6 @@ def test_print_generated_tool_contents_prints_each_file_once(
     _print_generated_tool_contents([a, b, a])
     output = capsys.readouterr().out
 
-    assert output.count("--- generated tool:") == 2
+    assert output.count("[Generated Tool ") == 2
     assert "print('a')" in output
     assert "print('b')" in output

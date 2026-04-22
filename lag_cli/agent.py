@@ -171,6 +171,11 @@ def _looks_like_wrapper_runner(code: str, existing_generated_files: list[str]) -
     return any(name in code for name in existing_names)
 
 
+def _is_runnable_tool_path(path_str: str) -> bool:
+    suffix = Path(path_str).suffix.lower()
+    return suffix in {".py", ".ipynb"}
+
+
 def _post_generate_content(
     *,
     url: str,
@@ -252,6 +257,23 @@ def _dispatch_tool(
     if name == "write_python_script":
         filename = str(args.get("filename") or default_output_file)
         code = str(args.get("code", ""))
+        if run_context.mode == "do":
+            existing_runnables = [
+                path_str
+                for path_str in existing_generated_files
+                if _is_runnable_tool_path(path_str)
+            ]
+            if existing_runnables and filename not in existing_runnables:
+                existing_name = Path(existing_runnables[0]).name
+                return {
+                    "status": "error",
+                    "message": (
+                        "Rejected additional runnable tool file in do mode. "
+                        f"Reuse the existing file '{existing_name}' instead of creating "
+                        f"'{Path(filename).name}'."
+                    ),
+                    "run_uid": run_context.run_uid,
+                }
         if run_context.mode == "do" and _looks_like_wrapper_runner(
             code, existing_generated_files
         ):
