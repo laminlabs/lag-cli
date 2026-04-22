@@ -64,3 +64,80 @@ def test_allows_overwriting_existing_runnable_filename_in_do_mode(
     )
     assert result["status"] == "success"
     assert result["file"] == "hello_agent.py"
+
+
+def test_defaults_python_extension_by_tool_type(monkeypatch) -> None:
+    run_context = RunContext(
+        run_uid="run-1",
+        mode="plan",
+        prompt="p",
+        model="m",
+    )
+    captured: dict[str, str] = {}
+
+    def _fake_write_python_script(**kwargs):
+        captured["filename"] = str(kwargs["filename"])
+        return {"status": "success", "file": str(kwargs["filename"])}
+
+    monkeypatch.setattr("lag_cli.agent.write_python_script", _fake_write_python_script)
+    _dispatch_tool(
+        name="write_python_script",
+        args={"code": "print('x')"},
+        run_context=run_context,
+        default_output_file=Path("plan_run.md"),
+        existing_generated_files=[],
+    )
+    assert captured["filename"].endswith(".py")
+    assert captured["filename"] == "plan_run.py"
+
+
+def test_defaults_notebook_extension_by_tool_type(monkeypatch) -> None:
+    run_context = RunContext(
+        run_uid="run-1",
+        mode="plan",
+        prompt="p",
+        model="m",
+    )
+    captured: dict[str, str] = {}
+
+    def _fake_write_jupyter_notebook(**kwargs):
+        captured["filename"] = str(kwargs["filename"])
+        return {"status": "success", "file": str(kwargs["filename"])}
+
+    monkeypatch.setattr(
+        "lag_cli.agent.write_jupyter_notebook", _fake_write_jupyter_notebook
+    )
+    _dispatch_tool(
+        name="write_jupyter_notebook",
+        args={"cells": [{"type": "code", "content": "x=1"}]},
+        run_context=run_context,
+        default_output_file=Path("plan_run.md"),
+        existing_generated_files=[],
+    )
+    assert captured["filename"].endswith(".ipynb")
+    assert captured["filename"] == "plan_run.ipynb"
+
+
+def test_defaults_markdown_extension_by_tool_type(monkeypatch) -> None:
+    run_context = RunContext(
+        run_uid="run-1",
+        mode="plan",
+        prompt="p",
+        model="m",
+    )
+    captured: dict[str, str] = {}
+
+    def _fake_write_markdown_plan(**kwargs):
+        captured["filename"] = str(kwargs["filename"])
+        return {"status": "success", "file": str(kwargs["filename"])}
+
+    monkeypatch.setattr("lag_cli.agent.write_markdown_plan", _fake_write_markdown_plan)
+    _dispatch_tool(
+        name="write_markdown_plan",
+        args={"markdown": "# Plan"},
+        run_context=run_context,
+        default_output_file=Path("analysis.py"),
+        existing_generated_files=[],
+    )
+    assert captured["filename"].endswith(".md")
+    assert captured["filename"] == "analysis.md"

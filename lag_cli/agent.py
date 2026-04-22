@@ -176,6 +176,18 @@ def _is_runnable_tool_path(path_str: str) -> bool:
     return suffix in {".py", ".ipynb"}
 
 
+def _default_filename_for_tool(tool_name: str, default_output_file: Path) -> str:
+    suffix_by_tool = {
+        "write_python_script": ".py",
+        "write_markdown_plan": ".md",
+        "write_jupyter_notebook": ".ipynb",
+    }
+    expected_suffix = suffix_by_tool.get(tool_name)
+    if expected_suffix is None:
+        return str(default_output_file)
+    return str(default_output_file.with_suffix(expected_suffix))
+
+
 def _post_generate_content(
     *,
     url: str,
@@ -255,7 +267,9 @@ def _dispatch_tool(
             run_uid=run_context.run_uid,
         )
     if name == "write_python_script":
-        filename = str(args.get("filename") or default_output_file)
+        filename = str(
+            args.get("filename") or ""
+        ).strip() or _default_filename_for_tool(name, default_output_file)
         code = str(args.get("code", ""))
         if run_context.mode == "do":
             existing_runnables = [
@@ -292,7 +306,9 @@ def _dispatch_tool(
             track_outputs=run_context.track_outputs,
         )
     if name == "write_jupyter_notebook":
-        filename = str(args.get("filename") or default_output_file)
+        filename = str(
+            args.get("filename") or ""
+        ).strip() or _default_filename_for_tool(name, default_output_file)
         cells = args.get("cells")
         if not isinstance(cells, list):
             cells = [{"type": "code", "content": ""}]
@@ -303,7 +319,9 @@ def _dispatch_tool(
             track_outputs=run_context.track_outputs,
         )
     if name == "write_markdown_plan":
-        filename = str(args.get("filename") or default_output_file)
+        filename = str(
+            args.get("filename") or ""
+        ).strip() or _default_filename_for_tool(name, default_output_file)
         return write_markdown_plan(
             markdown=str(args.get("markdown", "")),
             filename=filename,
