@@ -8,5 +8,5 @@ import pytest
 def setup_lamindb():
     ln.setup.init(storage="./testagentdb")
     yield
-    shutil.rmtree("./default_storage_unit_core")
+    shutil.rmtree("./testagentdb")
     ln.setup.delete("testagentdb", force=True)
