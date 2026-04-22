@@ -26,30 +26,29 @@ lag --prompt "Write a text file with 'Hello agent!' in it, please"
 
 ## Modes
 
-### Default mode
+### Default mode (execute only)
 
 - If a plan exists (`plan.md` or latest `plan_*.md`, or `--plan-file`), `lag` executes the referenced runnable tools.
-- Otherwise, `lag` generates runnable tool file(s), shows their contents, and asks for confirmation before execution.
-- In default mode, generated code includes `ln.track()` / `ln.finish()` unless `--no-track` is used.
+- Otherwise, `lag` executes existing runnable tools referenced in `--prompt` (explicit `.py` / `.ipynb` key or path).
+- Default mode does not create or update tools. If a referenced tool is missing, it fails with a clear error.
 
 ### Planning mode (`--plan`)
 
-Generate tools without executing them:
+Generate or update tools (without executing them):
 
 ```bash
 lag --plan --prompt "Write a plan for this analysis"
 ```
 
-Generated tool files are saved via `lamin save` in plan mode.
+Generated/updated tool files are saved via `lamin save` in plan mode.
 
 ## Common Flags
 
 - `--project <name>` sets `LAMIN_CURRENT_PROJECT`.
-- `--model <model-name>` selects the Gemini model.
-- `--output-file <path>` sets output filename for generated content.
+- `--model <model-name>` selects the Gemini model (`--plan` mode).
+- `--output-file <path>` sets output filename for generated content (`--plan` mode).
 - `--plan-file <path>` executes a specific plan in default mode.
-- `--no-track` disables `ln.track()` / `ln.finish()` injection.
-- `--yes` skips confirmation for executing newly generated tools.
+- `--no-track` disables `ln.track()` / `ln.finish()` injection in generated scripts/notebooks (`--plan` mode).
 
 ## Run Context Propagation
 

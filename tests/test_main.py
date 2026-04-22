@@ -3,9 +3,13 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
+import click
+import pytest
 from lag_cli.__main__ import (
+    _extract_runnable_keys_from_prompt,
     _parse_generated_paths,
     _print_generated_tool_contents,
+    _resolve_prompt_runnable_paths,
     _set_current_project_env,
     _warn_if_missing_project,
 )
@@ -53,3 +57,16 @@ def test_warn_if_missing_project_logs_warning(monkeypatch) -> None:
     monkeypatch.setattr("lag_cli.__main__.logger.warning", _fake_warning)
     _warn_if_missing_project(None)
     assert len(calls) == 1
+
+
+def test_extract_runnable_keys_from_prompt_deduplicates() -> None:
+    prompt = "rerun test-lag/create_fasta.py and test-lag/create_fasta.py plus x.ipynb"
+    keys = _extract_runnable_keys_from_prompt(prompt)
+    assert keys == ["test-lag/create_fasta.py", "x.ipynb"]
+
+
+def test_resolve_prompt_runnable_paths_requires_explicit_key() -> None:
+    with pytest.raises(
+        click.ClickException, match="Default mode executes existing tools only"
+    ):
+        _resolve_prompt_runnable_paths("please rerun the tool")

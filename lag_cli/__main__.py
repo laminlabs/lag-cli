@@ -16,6 +16,7 @@ from .run_context import RunContext, create_run_uid
 
 _STEP_PATTERN = re.compile(r"^step (\d+):\s*(.*)$")
 _GEMINI_ATTEMPT_PATTERN = re.compile(r"^gemini request attempt (\d+)/(\d+)$")
+_RUNNABLE_KEY_PATTERN = re.compile(r"([A-Za-z0-9_./-]+\.(?:py|ipynb))")
 _COLOR_ENABLED = os.getenv("NO_COLOR") is None
 
 
@@ -108,6 +109,66 @@ def _parse_generated_paths(generated_paths_csv: str) -> list[Path]:
         for path_str in generated_paths_csv.split(",")
         if path_str.strip()
     ]
+
+
+def _extract_runnable_keys_from_prompt(prompt: str) -> list[str]:
+    keys: list[str] = []
+    seen: set[str] = set()
+    for key in _RUNNABLE_KEY_PATTERN.findall(prompt):
+        normalized = key.strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        keys.append(normalized)
+    return keys
+
+
+def _materialize_transform_source(key: str) -> Path | None:
+    transform = ln.Transform.filter(key=key).one_or_none()
+    if transform is None:
+        return None
+    source_code = str(getattr(transform, "source_code", "") or "")
+    if not source_code:
+        artifact = ln.Artifact.filter(
+            transform=transform, suffix=Path(key).suffix
+        ).first()
+        if artifact is not None:
+            try:
+                source_code = artifact.open().read().decode("utf-8")
+            except Exception as exc:
+                raise click.ClickException(
+                    f"Found transform '{key}' but failed to read source artifact: {exc}"
+                ) from exc
+    if not source_code:
+        raise click.ClickException(
+            f"Found transform '{key}' but no executable source code was available."
+        )
+
+    output_path = Path(key).resolve()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(source_code, encoding="utf-8")
+    return output_path
+
+
+def _resolve_existing_runnable_path(key: str) -> Path:
+    local_path = Path(key).resolve()
+    if local_path.exists():
+        return local_path
+    materialized = _materialize_transform_source(key)
+    if materialized is not None:
+        return materialized
+    raise click.ClickException(
+        f"Runnable tool '{key}' was not found as a local file or transform key in the current instance."
+    )
+
+
+def _resolve_prompt_runnable_paths(prompt: str) -> list[Path]:
+    keys = _extract_runnable_keys_from_prompt(prompt)
+    if not keys:
+        raise click.ClickException(
+            "Default mode executes existing tools only. Include at least one .py/.ipynb tool key/path in --prompt, or use --plan to create/update tools."
+        )
+    return [_resolve_existing_runnable_path(key) for key in keys]
 
 
 def _set_current_project_env(project: str | None) -> str | None:
@@ -239,6 +300,23 @@ def execute_generated(
     }
 
 
+def execute_existing_from_prompt(prompt: str) -> dict[str, str | None]:
+    lamindb_run_uid = str(getattr(ln.context.run, "uid", "") or "") or None
+    run_uid = create_run_uid(lamindb_run_uid)
+    runnable_paths = _resolve_prompt_runnable_paths(prompt)
+    result = execute_runnable_paths(
+        prompt=prompt,
+        runnable_paths=runnable_paths,
+        run_uid=run_uid,
+        source="prompt_existing_tools",
+    )
+    return {
+        "run_uid": run_uid,
+        "resolved_paths": ",".join(str(path) for path in runnable_paths),
+        "final_text": str(result.get("final_text", "")),
+    }
+
+
 @click.command()
 @click.option("--prompt", required=True, type=str, help="User prompt.")
 @click.option(
@@ -261,12 +339,6 @@ def execute_generated(
     help="Disable automatic insertion of ln.track()/ln.finish() in generated scripts/notebooks.",
 )
 @click.option(
-    "--yes",
-    "auto_confirm_execute",
-    is_flag=True,
-    help="Auto-confirm execution of newly generated tools in default mode.",
-)
-@click.option(
     "--project",
     type=str,
     default=None,
@@ -281,7 +353,6 @@ def main(
     model: str,
     plan_file: Path | None,
     no_track: bool,
-    auto_confirm_execute: bool,
     project: str | None,
 ) -> None:
     """LAG CLI."""
@@ -319,42 +390,21 @@ def main(
         _secho(str(outcome["final_text"]), dim=True)
         return
 
-    outcome = run_agent_mode(
-        mode="do",
-        prompt=prompt,
-        output_file=output_file,
-        model=model,
-        track_outputs=not no_track,
-    )
+    outcome = execute_existing_from_prompt(prompt)
     _echo_section("Run")
     _echo_key_value("run_uid", str(outcome["run_uid"]), value_color="green")
-    if outcome["generated_path"]:
+    if outcome["resolved_paths"]:
+        resolved_paths = _parse_generated_paths(str(outcome["resolved_paths"]))
+        for resolved_path in resolved_paths:
+            _echo_key_value(
+                "resolved", str(resolved_path), value_color="bright_magenta"
+            )
+    if outcome.get("generated_path"):
         _echo_key_value(
             "generated",
             str(outcome["generated_path"]),
             value_color="bright_magenta",
         )
-    if outcome["generated_paths"]:
-        generated_paths_csv = str(outcome["generated_paths"])
-        generated_paths = _parse_generated_paths(generated_paths_csv)
-        _print_generated_tool_contents(generated_paths)
-        should_execute = auto_confirm_execute or click.confirm(
-            "Execute newly generated tool files now?",
-            default=True,
-        )
-        if should_execute:
-            exec_outcome = execute_generated(
-                prompt=prompt,
-                generated_paths_csv=generated_paths_csv,
-            )
-            _echo_key_value(
-                "exec_run_uid",
-                str(exec_outcome["run_uid"]),
-                value_color="green",
-            )
-            _secho(str(exec_outcome["final_text"]), dim=True)
-        else:
-            _echo_warning("Skipped execution of newly generated tools.")
     if outcome["final_text"]:
         _echo_section("Model Output")
         _secho(str(outcome["final_text"]), dim=True)
