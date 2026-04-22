@@ -1,3 +1,3 @@
-"""Minimal LAG CLI MVP."""
+"""Lag: Lamin's Agent CLI."""
 
-__version__ = "0.1.0"
+__version__ = "0.0.1"
