@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -39,5 +40,45 @@ def write_jupyter_notebook(
     return {
         "status": "success",
         "file": str(path),
+        "run_uid": run_uid,
+    }
+
+
+def write_markdown_plan(
+    *,
+    markdown: str,
+    filename: str,
+    run_uid: str,
+) -> dict[str, Any]:
+    path = Path(filename)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(markdown, encoding="utf-8")
+    return {
+        "status": "success",
+        "file": str(path),
+        "run_uid": run_uid,
+    }
+
+
+def write_from_template(
+    *,
+    template_path: str,
+    filename: str,
+    run_uid: str,
+) -> dict[str, Any]:
+    src = Path(template_path)
+    if not src.exists():
+        return {
+            "status": "error",
+            "message": f"Template not found: {src}",
+            "run_uid": run_uid,
+        }
+    dst = Path(filename)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dst)
+    return {
+        "status": "success",
+        "file": str(dst),
+        "template": str(src),
         "run_uid": run_uid,
     }

@@ -7,7 +7,8 @@ from uuid import uuid4
 @dataclass(slots=True)
 class RunContext:
     run_uid: str
-    task: str
+    mode: str
+    prompt: str
     model: str
     output_format: str
 

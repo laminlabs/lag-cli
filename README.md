@@ -6,6 +6,7 @@ Minimal code-generating agent MVP using Gemini REST and LaminDB tracking.
 
 - Runs a Gemini tool-calling loop with no agent framework SDK.
 - Generates either a runnable Python script (`.py`) or notebook (`.ipynb`).
+- Executes script paths listed in markdown plans via the `do` workflow.
 - Optionally pulls context from:
   - local scientific skill `SKILL.md` files
   - `laminlabs/biomed-skills` via direct LaminDB lookup
@@ -28,18 +29,30 @@ GEMINI_API_KEY=your_api_key_here
 
 3. Ensure LaminDB is initialized/connected for your target instance.
 
-## Run
+## Commands
 
-Generate a Python script:
+Create a markdown plan:
 
 ```bash
-lag run --task "Analyze single-cell RNA-seq data using Scanpy"
+lag plan run --prompt "Create a plan for single-cell RNA-seq analysis"
+```
+
+Create a Python script from a prompt:
+
+```bash
+lag plan run --prompt "Write a Scanpy analysis script" --output-format py
+```
+
+Execute scripts referenced in an existing plan:
+
+```bash
+lag do run --prompt "Execute this plan" --plan-file ./plan.md
 ```
 
 Optional flags:
 
 - `--model gemini-2.5-flash`
-- `--output-file my_analysis.py`
+- `--output-file my_analysis.py` (plan group only)
 
 ## Notes
 

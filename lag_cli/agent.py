@@ -6,20 +6,31 @@ from typing import TYPE_CHECKING, Any
 import requests
 
 from .context import get_lamindb_skill, get_local_skill
-from .writer import write_jupyter_notebook, write_python_script
+from .writer import (
+    write_from_template,
+    write_jupyter_notebook,
+    write_markdown_plan,
+    write_python_script,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from .run_context import RunContext
 
-SYSTEM_INSTRUCTION = (
+PLAN_SYSTEM_INSTRUCTION = (
+    "You are a planning and generation agent. For each prompt, you may read skills, "
+    "query LaminDB, write markdown plans, generate scripts/notebooks from scratch, "
+    "or create outputs from templates."
+)
+
+DO_SYSTEM_INSTRUCTION = (
     "You are a scientific coding agent. First retrieve relevant context when useful, "
-    "then write runnable analysis code as either a Python script or Jupyter notebook."
+    "then write runnable analysis code."
 )
 
 
-def _function_declarations(output_format: str) -> list[dict[str, Any]]:
+def _function_declarations(mode: str, output_format: str) -> list[dict[str, Any]]:
     declarations: list[dict[str, Any]] = [
         {
             "name": "get_local_skill",
@@ -46,7 +57,36 @@ def _function_declarations(output_format: str) -> list[dict[str, Any]]:
             },
         },
     ]
-    if output_format == "ipynb":
+    if mode == "plan":
+        declarations.extend(
+            [
+                {
+                    "name": "write_markdown_plan",
+                    "description": "Write a markdown planning document.",
+                    "parameters": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "filename": {"type": "STRING"},
+                            "markdown": {"type": "STRING"},
+                        },
+                        "required": ["filename", "markdown"],
+                    },
+                },
+                {
+                    "name": "write_from_template",
+                    "description": "Create a file from an existing template path.",
+                    "parameters": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "template_path": {"type": "STRING"},
+                            "filename": {"type": "STRING"},
+                        },
+                        "required": ["template_path", "filename"],
+                    },
+                },
+            ]
+        )
+    if output_format == "ipynb" or mode == "plan":
         declarations.append(
             {
                 "name": "write_jupyter_notebook",
@@ -71,7 +111,7 @@ def _function_declarations(output_format: str) -> list[dict[str, Any]]:
                 },
             }
         )
-    else:
+    if output_format == "py" or mode == "plan":
         declarations.append(
             {
                 "name": "write_python_script",
@@ -89,8 +129,8 @@ def _function_declarations(output_format: str) -> list[dict[str, Any]]:
     return declarations
 
 
-def _tool_payload(output_format: str) -> list[dict[str, Any]]:
-    return [{"functionDeclarations": _function_declarations(output_format)}]
+def _tool_payload(mode: str, output_format: str) -> list[dict[str, Any]]:
+    return [{"functionDeclarations": _function_declarations(mode, output_format)}]
 
 
 def _extract_text(parts: list[dict[str, Any]]) -> str:
@@ -138,6 +178,20 @@ def _dispatch_tool(
             filename=filename,
             run_uid=run_context.run_uid,
         )
+    if name == "write_markdown_plan":
+        filename = str(args.get("filename") or default_output_file)
+        return write_markdown_plan(
+            markdown=str(args.get("markdown", "")),
+            filename=filename,
+            run_uid=run_context.run_uid,
+        )
+    if name == "write_from_template":
+        filename = str(args.get("filename") or default_output_file)
+        return write_from_template(
+            template_path=str(args.get("template_path", "")),
+            filename=filename,
+            run_uid=run_context.run_uid,
+        )
     return {
         "status": "error",
         "message": f"Unknown tool: {name}",
@@ -152,6 +206,9 @@ def run_agent(
     output_file: Path,
     max_steps: int = 20,
 ) -> dict[str, Any]:
+    system_instruction = (
+        PLAN_SYSTEM_INSTRUCTION if run_context.mode == "plan" else DO_SYSTEM_INSTRUCTION
+    )
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
         f"{run_context.model}:generateContent?key={api_key}"
@@ -160,7 +217,7 @@ def run_agent(
         {
             "role": "user",
             "parts": [
-                {"text": f"{SYSTEM_INSTRUCTION}\n\nTask: {run_context.task}"},
+                {"text": f"{system_instruction}\n\nPrompt: {run_context.prompt}"},
             ],
         }
     ]
@@ -171,7 +228,7 @@ def run_agent(
     for step in range(1, max_steps + 1):
         payload = {
             "contents": contents,
-            "tools": _tool_payload(run_context.output_format),
+            "tools": _tool_payload(run_context.mode, run_context.output_format),
             "generationConfig": {"temperature": 0.2},
         }
         response = requests.post(url, json=payload, timeout=120)
