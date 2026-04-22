@@ -138,7 +138,7 @@ def _print_generated_tool_contents(paths: list[Path]) -> None:
         _secho("--- end generated tool ---", fg="black")
 
 
-def _flow_run_agent_mode(
+def run_agent_mode(
     *,
     mode: str,
     prompt: str,
@@ -191,7 +191,7 @@ def _flow_run_agent_mode(
     }
 
 
-def _flow_execute_plan(
+def execute_the_plan(
     prompt: str,
     plan_file: Path,
 ) -> dict[str, str | None]:
@@ -210,7 +210,7 @@ def _flow_execute_plan(
     }
 
 
-def _flow_execute_generated(
+def execute_generated(
     *,
     prompt: str,
     generated_paths_csv: str,
@@ -286,7 +286,7 @@ def main(
     """LAG CLI."""
     _warn_if_missing_project(project)
     if plan_mode:
-        outcome = _flow_run_agent_mode(
+        outcome = run_agent_mode(
             mode="plan",
             prompt=prompt,
             output_file=output_file,
@@ -309,7 +309,7 @@ def main(
 
     chosen_plan_file = find_plan_file(plan_file)
     if chosen_plan_file is not None:
-        outcome = _flow_execute_plan(
+        outcome = execute_the_plan(
             prompt=prompt,
             plan_file=chosen_plan_file,
         )
@@ -319,7 +319,7 @@ def main(
         _secho(str(outcome["final_text"]))
         return
 
-    outcome = _flow_run_agent_mode(
+    outcome = run_agent_mode(
         mode="do",
         prompt=prompt,
         output_file=output_file,
@@ -344,7 +344,7 @@ def main(
             default=True,
         )
         if should_execute:
-            exec_outcome = _flow_execute_generated(
+            exec_outcome = execute_generated(
                 prompt=prompt,
                 generated_paths_csv=generated_paths_csv,
             )
