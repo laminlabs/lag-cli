@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 from .agent import run_agent
 from .do_executor import execute_plan, execute_runnable_paths, find_plan_file
-from .output_saver import save_generated_artifact, save_generated_tool_files
+from .output_saver import save_generated_tool_files
 from .run_context import RunContext, create_run_uid
 
 
@@ -62,11 +62,6 @@ def _flow_run_agent_mode(
     ]
     if mode == "plan":
         save_generated_tool_files(generated_files)
-    else:
-        save_generated_artifact(
-            generated_file if isinstance(generated_file, str) else None,
-            run_uid,
-        )
     return {
         "run_uid": run_uid,
         "generated_path": generated_file if isinstance(generated_file, str) else None,

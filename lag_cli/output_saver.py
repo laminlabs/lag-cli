@@ -4,19 +4,6 @@ import subprocess
 from pathlib import Path
 
 import click
-import lamindb as ln
-
-
-def save_generated_artifact(path_str: str | None, run_uid: str) -> None:
-    if not path_str:
-        return
-    path = Path(path_str)
-    if not path.exists():
-        return
-    ln.Artifact(
-        str(path),
-        description=f"Generated analysis output (run_uid={run_uid})",
-    ).save()
 
 
 def save_generated_tool_files(paths: list[str]) -> None:

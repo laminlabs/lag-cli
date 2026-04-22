@@ -11,29 +11,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def test_save_generated_artifact_saves_existing_file(
-    tmp_path: Path, monkeypatch
-) -> None:
-    output = tmp_path / "out.py"
-    output.write_text("print('x')\n", encoding="utf-8")
-
-    calls: list[tuple[str, str]] = []
-
-    class _DummyArtifact:
-        def __init__(self, path: str, *, description: str) -> None:
-            calls.append((path, description))
-
-        def save(self) -> None:
-            return
-
-    monkeypatch.setattr(output_saver.ln, "Artifact", _DummyArtifact)
-    output_saver.save_generated_artifact(str(output), "run-123")
-
-    assert calls == [
-        (str(output), "Generated analysis output (run_uid=run-123)"),
-    ]
-
-
 def test_save_generated_tool_files_uses_lamin_save(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
