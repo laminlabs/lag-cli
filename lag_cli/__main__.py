@@ -26,7 +26,7 @@ def run(
     output_file: Path | None,
     model: str,
 ) -> None:
-    workspace_env_path = Path("~/work/.env").expanduser()
+    workspace_env_path = Path("~/work/llms.env").expanduser()
     load_dotenv(dotenv_path=workspace_env_path)
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
