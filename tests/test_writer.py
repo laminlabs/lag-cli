@@ -17,7 +17,7 @@ def test_write_python_script(tmp_path: Path) -> None:
     text = out.read_text(encoding="utf-8")
     assert "ln.track()" in text
     assert "ln.finish()" in text
-    assert "ln.Artifact(" in text
+    assert "_lag_before_files" not in text
 
 
 def test_write_jupyter_notebook(tmp_path: Path) -> None:
@@ -36,7 +36,6 @@ def test_write_jupyter_notebook(tmp_path: Path) -> None:
     code_sources = [cell.source for cell in nb.cells if cell.cell_type == "code"]
     assert any("ln.track()" in src for src in code_sources)
     assert any("ln.finish()" in src for src in code_sources)
-    assert any("ln.Artifact(" in src for src in code_sources)
 
 
 def test_write_python_script_no_track(tmp_path: Path) -> None:
@@ -51,4 +50,3 @@ def test_write_python_script_no_track(tmp_path: Path) -> None:
     text = out.read_text(encoding="utf-8")
     assert "ln.track()" not in text
     assert "ln.finish()" not in text
-    assert "ln.Artifact(" not in text

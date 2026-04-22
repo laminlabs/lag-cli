@@ -11,54 +11,27 @@ def _ensure_tracked_python_code(code: str) -> str:
     text = code.rstrip() + "\n"
     has_track = "ln.track(" in text
     has_finish = "ln.finish(" in text
-    has_artifact = "ln.Artifact(" in text
 
-    if has_track and has_finish and has_artifact:
+    if has_track and has_finish:
         return text
 
     pieces: list[str] = []
     if "import lamindb as ln" not in text:
         pieces.append("import lamindb as ln\n")
-    if "from pathlib import Path" not in text:
-        pieces.append("from pathlib import Path\n")
     if not has_track:
         pieces.append("ln.track()\n")
-    if not has_artifact:
-        pieces.append(
-            "_lag_before_files = {p.resolve() for p in Path('.').rglob('*') if p.is_file()}\n"
-        )
     pieces.append(text)
-    if not has_artifact:
-        pieces.append(
-            "\n_lag_after_files = {p.resolve() for p in Path('.').rglob('*') if p.is_file()}\n"
-            "for _lag_path in sorted(_lag_after_files - _lag_before_files):\n"
-            "    if _lag_path.name in {'trace.txt', 'trace_exec.txt'}:\n"
-            "        continue\n"
-            "    ln.Artifact(str(_lag_path), description='Generated output artifact').save()\n"
-        )
     if not has_finish:
         pieces.append("\nln.finish()\n")
     return "".join(pieces)
 
 
 def _tracking_prologue_cell() -> str:
-    return (
-        "import lamindb as ln\n"
-        "from pathlib import Path\n\n"
-        "ln.track()\n"
-        "_lag_before_files = {p.resolve() for p in Path('.').rglob('*') if p.is_file()}\n"
-    )
+    return "import lamindb as ln\n\nln.track()\n"
 
 
 def _tracking_epilogue_cell() -> str:
-    return (
-        "_lag_after_files = {p.resolve() for p in Path('.').rglob('*') if p.is_file()}\n"
-        "for _lag_path in sorted(_lag_after_files - _lag_before_files):\n"
-        "    if _lag_path.name in {'trace.txt', 'trace_exec.txt'}:\n"
-        "        continue\n"
-        "    ln.Artifact(str(_lag_path), description='Generated output artifact').save()\n"
-        "ln.finish()\n"
-    )
+    return "ln.finish()\n"
 
 
 def write_python_script(
