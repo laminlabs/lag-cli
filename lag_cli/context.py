@@ -38,31 +38,15 @@ def get_local_skill(
     }
 
 
-def get_lamindb_skill(*, query: str, run_uid: str, limit: int = 5) -> dict[str, Any]:
-    """Best-effort direct lookup from laminlabs/biomed-skills."""
-    original_slug: str | None = None
-    warnings: list[str] = []
-    try:
-        original_slug = str(ln.setup.settings.instance.slug)
-    except Exception as exc:
-        original_slug = None
-        warnings.append(f"Could not read current LaminDB instance before lookup: {exc}")
-
-    try:
-        ln.connect("laminlabs/biomed-skills")
-    except Exception as exc:
-        return {
-            "run_uid": run_uid,
-            "query": query,
-            "results": [],
-            "message": f"Could not connect to laminlabs/biomed-skills: {exc}",
-        }
-
+def _collect_db_matches(
+    db: Any, query: str, limit: int
+) -> tuple[list[dict[str, str]], list[str]]:
     query_lower = query.lower()
     results: list[dict[str, str]] = []
+    warnings: list[str] = []
 
     try:
-        transforms = ln.Transform.filter().all()
+        transforms = db.Transform.filter().all()
         for transform in transforms:
             name = str(getattr(transform, "name", "") or "")
             desc = str(getattr(transform, "description", "") or "")
@@ -83,7 +67,7 @@ def get_lamindb_skill(*, query: str, run_uid: str, limit: int = 5) -> dict[str, 
 
     try:
         if len(results) < limit:
-            artifacts = ln.Artifact.filter().all()
+            artifacts = db.Artifact.filter().all()
             for artifact in artifacts:
                 desc = str(getattr(artifact, "description", "") or "")
                 key = str(getattr(artifact, "key", "") or "")
@@ -102,18 +86,51 @@ def get_lamindb_skill(*, query: str, run_uid: str, limit: int = 5) -> dict[str, 
     except Exception as exc:
         warnings.append(f"Artifact lookup failed: {exc}")
 
+    return results, warnings
+
+
+def get_lamindb_skill(*, query: str, run_uid: str, limit: int = 5) -> dict[str, Any]:
+    """Best-effort lookup from the current instance, then biomed-skills fallback."""
+    current_slug: str | None = None
+    warnings: list[str] = []
+
+    try:
+        current_slug = str(ln.setup.settings.instance.slug)
+    except Exception as exc:
+        current_slug = None
+        warnings.append(f"Could not read current LaminDB instance before lookup: {exc}")
+
+    slugs_to_search: list[str] = []
+    if current_slug:
+        slugs_to_search.append(current_slug)
+    if "laminlabs/biomed-skills" not in slugs_to_search:
+        slugs_to_search.append("laminlabs/biomed-skills")
+
+    results: list[dict[str, str]] = []
+    searched_instances: list[str] = []
+
+    for slug in slugs_to_search:
+        try:
+            db = ln.DB(slug)
+            searched_instances.append(slug)
+        except Exception as exc:
+            warnings.append(f"Could not open DB('{slug}'): {exc}")
+            continue
+
+        instance_results, instance_warnings = _collect_db_matches(
+            db=db, query=query, limit=limit
+        )
+        warnings.extend(instance_warnings)
+        results.extend(instance_results)
+        if results:
+            break
+
     payload = {
         "run_uid": run_uid,
         "query": query,
         "results": results,
+        "searched_instances": searched_instances,
         "message": f"Found {len(results)} LaminDB matches for '{query}'.",
         "warnings": warnings,
     }
-    if original_slug:
-        try:
-            ln.connect(original_slug)
-        except Exception as exc:
-            warnings.append(
-                f"Could not reconnect to original instance {original_slug}: {exc}"
-            )
     return payload
