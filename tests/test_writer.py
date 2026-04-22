@@ -50,3 +50,15 @@ def test_write_python_script_no_track(tmp_path: Path) -> None:
     text = out.read_text(encoding="utf-8")
     assert "ln.track()" not in text
     assert "ln.finish()" not in text
+
+
+def test_write_python_script_places_track_after_import(tmp_path: Path) -> None:
+    out = tmp_path / "ordered.py"
+    result = write_python_script(
+        code="import lamindb as ln\n\nprint('hello')\n",
+        filename=str(out),
+        run_uid="test-run",
+    )
+    assert result["status"] == "success"
+    text = out.read_text(encoding="utf-8")
+    assert text.startswith("import lamindb as ln\nln.track()\n")
