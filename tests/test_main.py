@@ -7,6 +7,7 @@ from lag_cli.__main__ import (
     _parse_generated_paths,
     _print_generated_tool_contents,
     _set_current_project_env,
+    _warn_if_missing_project,
 )
 
 if TYPE_CHECKING:
@@ -37,7 +38,18 @@ def test_print_generated_tool_contents_prints_each_file_once(
 
 
 def test_set_current_project_env_sets_current_project(monkeypatch) -> None:
-    monkeypatch.delenv("CURRENT_PROJECT", raising=False)
+    monkeypatch.delenv("LAMIN_CURRENT_PROJECT", raising=False)
     project = _set_current_project_env("demo-project")
     assert project == "demo-project"
-    assert os.environ["CURRENT_PROJECT"] == "demo-project"
+    assert os.environ["LAMIN_CURRENT_PROJECT"] == "demo-project"
+
+
+def test_warn_if_missing_project_logs_warning(monkeypatch) -> None:
+    calls: list[str] = []
+
+    def _fake_warning(message: str) -> None:
+        calls.append(message)
+
+    monkeypatch.setattr("lag_cli.__main__.logger.warning", _fake_warning)
+    _warn_if_missing_project(None)
+    assert len(calls) == 1

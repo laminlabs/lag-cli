@@ -7,6 +7,7 @@ from pathlib import Path
 import click
 import lamindb as ln
 from dotenv import load_dotenv
+from lamin_utils import logger
 
 from .agent import run_agent
 from .do_executor import execute_plan, execute_runnable_paths, find_plan_file
@@ -106,7 +107,7 @@ def _parse_generated_paths(generated_paths_csv: str) -> list[Path]:
 
 def _set_current_project_env(project: str | None) -> str | None:
     if project:
-        os.environ["CURRENT_PROJECT"] = project
+        os.environ["LAMIN_CURRENT_PROJECT"] = project
     return project
 
 
@@ -114,6 +115,13 @@ def _project_option_callback(
     _ctx: click.Context, _param: click.Parameter, value: str | None
 ) -> str | None:
     return _set_current_project_env(value)
+
+
+def _warn_if_missing_project(project: str | None) -> None:
+    if not project:
+        logger.warning(
+            "No --project was provided; LAMIN_CURRENT_PROJECT is unset for this run."
+        )
 
 
 def _print_generated_tool_contents(paths: list[Path]) -> None:
@@ -260,7 +268,7 @@ def _flow_execute_generated(
     type=str,
     default=None,
     callback=_project_option_callback,
-    help="Project name to set as CURRENT_PROJECT for the initiated run.",
+    help="Project name to set as LAMIN_CURRENT_PROJECT for the initiated run.",
 )
 @ln.flow("wDJpT3xdqjY8")
 def main(
@@ -275,6 +283,7 @@ def main(
     project: str | None,
 ) -> None:
     """LAG CLI."""
+    _warn_if_missing_project(project)
     if plan_mode:
         _echo_section("User Input")
         _echo_key_value("prompt", prompt, value_color="cyan")
