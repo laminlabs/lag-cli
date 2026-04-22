@@ -3,24 +3,24 @@ requires = ["flit_core >=3.2,<4"]
 build-backend = "flit_core.buildapi"
 
 [project]
-name = "laminagent"
+name = "lag-cli"
 requires-python = ">=3.10,<3.14"
 authors = [{name = "Lamin Labs", email = "open-source@lamin.ai"}]
 readme = "README.md"
 dynamic = ["version", "description"]
 dependencies = [
     "click",
-    "lamindb-core",
+    "lamindb",
     "nbformat",
     "python-dotenv",
     "requests",
 ]
 
 [project.scripts]
-laminagent = "laminagent.__main__:main"
+lag-cli = "lag_cli.__main__:main"
 
 [project.urls]
-Home = "https://github.com/laminlabs/laminagent"
+Home = "https://github.com/laminlabs/lag-cli"
 
 [project.optional-dependencies]
 dev = [
@@ -39,7 +39,7 @@ filterwarnings = [
 ]
 
 [tool.ruff]
-src = ["laminagent", "tests"]
+src = ["lag_cli", "tests"]
 line-length = 88
 lint.select = [
     "F",  # Errors detected by Pyflakes

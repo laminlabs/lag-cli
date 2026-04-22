@@ -1,4 +1,4 @@
-# laminagent
+# lag-cli
 
 Minimal code-generating agent MVP using Gemini REST and LaminDB tracking.
 
@@ -33,20 +33,13 @@ GEMINI_API_KEY=your_api_key_here
 Generate a Python script:
 
 ```bash
-laminagent run --task "Analyze single-cell RNA-seq data using Scanpy" --output-format py
-```
-
-Generate a notebook:
-
-```bash
-laminagent run --task "Do exploratory analysis of a CSV and plot summary stats" --output-format ipynb
+lag-cli run --task "Analyze single-cell RNA-seq data using Scanpy"
 ```
 
 Optional flags:
 
 - `--model gemini-2.5-flash`
 - `--output-file my_analysis.py`
-- `--trace-json` (save `trace.json` in addition to `trace.txt`)
 
 ## Notes
 
