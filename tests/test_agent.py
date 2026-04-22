@@ -29,7 +29,6 @@ def test_rejects_additional_runnable_filename_in_do_mode() -> None:
         mode="do",
         prompt="p",
         model="m",
-        output_format="py",
     )
     result = _dispatch_tool(
         name="write_python_script",
@@ -50,7 +49,6 @@ def test_allows_overwriting_existing_runnable_filename_in_do_mode(
         mode="do",
         prompt="p",
         model="m",
-        output_format="py",
     )
 
     def _fake_write_python_script(**kwargs):

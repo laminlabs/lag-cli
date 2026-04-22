@@ -144,7 +144,6 @@ def run_agent_mode(
     prompt: str,
     output_file: Path | None,
     model: str,
-    output_format: str,
     track_outputs: bool,
 ) -> dict[str, str | None]:
     workspace_env_path = Path("~/llms.env").expanduser()
@@ -156,7 +155,7 @@ def run_agent_mode(
     lamindb_run_uid = str(getattr(ln.context.run, "uid", "") or "") or None
     run_uid = create_run_uid(lamindb_run_uid)
 
-    suffix = "md" if output_format == "md" else output_format
+    suffix = "md" if mode == "plan" else "py"
     default_name = f"{mode}_{run_uid}.{suffix}"
     output_path = output_file or Path(default_name)
 
@@ -165,7 +164,6 @@ def run_agent_mode(
         mode=mode,
         prompt=prompt,
         model=model,
-        output_format=output_format,
         track_outputs=track_outputs,
     )
     result = run_agent(
@@ -241,13 +239,6 @@ def execute_generated(
 @click.option("--output-file", type=click.Path(path_type=Path), default=None)
 @click.option("--model", type=str, default="gemini-flash-latest", show_default=True)
 @click.option(
-    "--output-format",
-    type=click.Choice(["md", "py", "ipynb"], case_sensitive=False),
-    default="md",
-    show_default=True,
-    help="Used in --plan mode; ignored otherwise.",
-)
-@click.option(
     "--plan-file",
     type=click.Path(path_type=Path, exists=True),
     default=None,
@@ -277,7 +268,6 @@ def main(
     plan_mode: bool,
     output_file: Path | None,
     model: str,
-    output_format: str,
     plan_file: Path | None,
     no_track: bool,
     auto_confirm_execute: bool,
@@ -291,7 +281,6 @@ def main(
             prompt=prompt,
             output_file=output_file,
             model=model,
-            output_format=output_format,
             track_outputs=not no_track,
         )
         _echo_section("Run")
@@ -324,7 +313,6 @@ def main(
         prompt=prompt,
         output_file=output_file,
         model=model,
-        output_format="py",
         track_outputs=not no_track,
     )
     _echo_section("Run")

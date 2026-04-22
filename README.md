@@ -47,7 +47,6 @@ Generated tool files are saved via `lamin save` in plan mode.
 - `--project <name>` sets `LAMIN_CURRENT_PROJECT`.
 - `--model <model-name>` selects the Gemini model.
 - `--output-file <path>` sets output filename for generated content.
-- `--output-format [md|py|ipynb]` applies in `--plan` mode.
 - `--plan-file <path>` executes a specific plan in default mode.
 - `--no-track` disables `ln.track()` / `ln.finish()` injection.
 - `--yes` skips confirmation for executing newly generated tools.

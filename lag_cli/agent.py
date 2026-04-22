@@ -36,7 +36,7 @@ DO_SYSTEM_INSTRUCTION = (
 )
 
 
-def _function_declarations(mode: str, output_format: str) -> list[dict[str, Any]]:
+def _function_declarations(mode: str) -> list[dict[str, Any]]:
     declarations: list[dict[str, Any]] = [
         {
             "name": "get_local_skill",
@@ -92,7 +92,7 @@ def _function_declarations(mode: str, output_format: str) -> list[dict[str, Any]
                 },
             ]
         )
-    if output_format == "ipynb" or mode == "plan":
+    if mode == "plan":
         declarations.append(
             {
                 "name": "write_jupyter_notebook",
@@ -117,7 +117,7 @@ def _function_declarations(mode: str, output_format: str) -> list[dict[str, Any]
                 },
             }
         )
-    if output_format == "py" or mode == "plan":
+    if mode in {"plan", "do"}:
         declarations.append(
             {
                 "name": "write_python_script",
@@ -135,8 +135,8 @@ def _function_declarations(mode: str, output_format: str) -> list[dict[str, Any]
     return declarations
 
 
-def _tool_payload(mode: str, output_format: str) -> list[dict[str, Any]]:
-    return [{"functionDeclarations": _function_declarations(mode, output_format)}]
+def _tool_payload(mode: str) -> list[dict[str, Any]]:
+    return [{"functionDeclarations": _function_declarations(mode)}]
 
 
 def _extract_text(parts: list[dict[str, Any]]) -> str:
@@ -359,7 +359,7 @@ def run_agent(
             progress_callback(f"step {step}: waiting for model response")
         payload = {
             "contents": contents,
-            "tools": _tool_payload(run_context.mode, run_context.output_format),
+            "tools": _tool_payload(run_context.mode),
             "generationConfig": {"temperature": 0.2},
         }
         data = _post_generate_content(

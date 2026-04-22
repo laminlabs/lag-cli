@@ -10,7 +10,6 @@ class RunContext:
     mode: str
     prompt: str
     model: str
-    output_format: str
     track_outputs: bool = True
 
 
