@@ -10,7 +10,7 @@ readme = "README.md"
 dynamic = ["version", "description"]
 dependencies = [
     "click",
-    "lamindb",
+    "lamindb-core",
     "nbformat",
     "python-dotenv",
     "requests",
