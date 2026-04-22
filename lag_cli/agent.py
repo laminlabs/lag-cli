@@ -176,6 +176,11 @@ def _is_runnable_tool_path(path_str: str) -> bool:
     return suffix in {".py", ".ipynb"}
 
 
+def _is_explicit_tool_key(key: str) -> bool:
+    stripped = key.strip().lower()
+    return stripped.endswith(".py") or stripped.endswith(".ipynb")
+
+
 def _default_filename_for_tool(tool_name: str, default_output_file: Path) -> str:
     suffix_by_tool = {
         "write_python_script": ".py",
@@ -261,11 +266,29 @@ def _dispatch_tool(
             run_uid=run_context.run_uid,
         )
     if name == "get_lamindb_skill":
-        return get_lamindb_skill(
-            key=str(args.get("key", "")),
+        key = str(args.get("key", ""))
+        result = get_lamindb_skill(
+            key=key,
             limit=int(args.get("limit", 5)),
             run_uid=run_context.run_uid,
         )
+        if (
+            run_context.mode == "do"
+            and _is_explicit_tool_key(key)
+            and not result.get("results")
+        ):
+            searched = result.get("searched_instances", [])
+            searched_str = ", ".join(searched) if isinstance(searched, list) else "none"
+            return {
+                "status": "error",
+                "fatal": True,
+                "run_uid": run_context.run_uid,
+                "message": (
+                    f"Tool key '{key}' was not found in searched instances ({searched_str}). "
+                    "Aborting without generating a new tool."
+                ),
+            }
+        return result
     if name == "write_python_script":
         filename = str(
             args.get("filename") or ""
@@ -368,6 +391,7 @@ def run_agent(
     generated_file: str | None = None
     generated_files: list[str] = []
     final_text = ""
+    fatal_error: str | None = None
     if progress_callback is not None:
         progress_callback(f"mode={run_context.mode} model={run_context.model}")
         progress_callback(f"prompt: {run_context.prompt}")
@@ -456,6 +480,16 @@ def run_agent(
             if progress_callback is not None:
                 status = result.get("status", "ok")
                 progress_callback(f"step {step}: tool result status={status}")
+                if status == "error" and result.get("message"):
+                    progress_callback(f"step {step}: tool error: {result['message']}")
+
+            if result.get("fatal"):
+                fatal_error = str(result.get("message", "Fatal tool error."))
+                break
+
+        if fatal_error is not None:
+            final_text = fatal_error
+            break
 
     return {
         "run_uid": run_context.run_uid,

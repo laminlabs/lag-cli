@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from lag_cli.agent import _dispatch_tool, _looks_like_wrapper_runner
+from lag_cli.agent import _dispatch_tool, _looks_like_wrapper_runner, run_agent
 from lag_cli.run_context import RunContext
 
 
@@ -141,3 +141,79 @@ def test_defaults_markdown_extension_by_tool_type(monkeypatch) -> None:
     )
     assert captured["filename"].endswith(".md")
     assert captured["filename"] == "analysis.md"
+
+
+def test_fails_fast_when_explicit_tool_key_not_found_in_do_mode(monkeypatch) -> None:
+    run_context = RunContext(
+        run_uid="run-1",
+        mode="do",
+        prompt="rerun tool",
+        model="m",
+    )
+
+    monkeypatch.setattr(
+        "lag_cli.agent.get_lamindb_skill",
+        lambda **_kwargs: {
+            "run_uid": "run-1",
+            "results": [],
+            "searched_instances": ["laminlabs/lamindata"],
+        },
+    )
+
+    result = _dispatch_tool(
+        name="get_lamindb_skill",
+        args={"key": "test-lag/create_fasta.py"},
+        run_context=run_context,
+        default_output_file=Path("out.py"),
+        existing_generated_files=[],
+    )
+
+    assert result["status"] == "error"
+    assert result["fatal"] is True
+    assert "Aborting without generating a new tool." in str(result["message"])
+
+
+def test_run_agent_stops_after_fatal_tool_error(monkeypatch) -> None:
+    run_context = RunContext(
+        run_uid="run-1",
+        mode="do",
+        prompt="rerun",
+        model="m",
+    )
+
+    tool_response = {
+        "candidates": [
+            {
+                "content": {
+                    "parts": [
+                        {
+                            "functionCall": {
+                                "name": "get_lamindb_skill",
+                                "args": {"key": "test-lag/create_fasta.py"},
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+    monkeypatch.setattr(
+        "lag_cli.agent._post_generate_content", lambda **_kwargs: tool_response
+    )
+    monkeypatch.setattr(
+        "lag_cli.agent._dispatch_tool",
+        lambda **_kwargs: {
+            "status": "error",
+            "fatal": True,
+            "message": "Tool key 'test-lag/create_fasta.py' was not found.",
+        },
+    )
+
+    result = run_agent(
+        api_key="dummy",
+        run_context=run_context,
+        output_file=Path("out.py"),
+        max_steps=5,
+    )
+
+    assert result["final_text"] == "Tool key 'test-lag/create_fasta.py' was not found."
