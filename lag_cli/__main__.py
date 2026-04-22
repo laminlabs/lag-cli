@@ -104,6 +104,18 @@ def _parse_generated_paths(generated_paths_csv: str) -> list[Path]:
     ]
 
 
+def _set_current_project_env(project: str | None) -> str | None:
+    if project:
+        os.environ["CURRENT_PROJECT"] = project
+    return project
+
+
+def _project_option_callback(
+    _ctx: click.Context, _param: click.Parameter, value: str | None
+) -> str | None:
+    return _set_current_project_env(value)
+
+
 def _print_generated_tool_contents(paths: list[Path]) -> None:
     seen: set[Path] = set()
     for path in paths:
@@ -243,6 +255,13 @@ def _flow_execute_generated(
     is_flag=True,
     help="Auto-confirm execution of newly generated tools in default do mode.",
 )
+@click.option(
+    "--project",
+    type=str,
+    default=None,
+    callback=_project_option_callback,
+    help="Project name to set as CURRENT_PROJECT for the initiated run.",
+)
 @ln.flow("wDJpT3xdqjY8")
 def main(
     prompt: str,
@@ -253,12 +272,15 @@ def main(
     plan_file: Path | None,
     no_track: bool,
     auto_confirm_execute: bool,
+    project: str | None,
 ) -> None:
     """LAG CLI."""
     if plan_mode:
         _echo_section("User Input")
         _echo_key_value("prompt", prompt, value_color="cyan")
         _echo_key_value("mode", "plan", value_color="bright_cyan")
+        if project:
+            _echo_key_value("project", project, value_color="bright_green")
         outcome = _flow_run_agent_mode(
             mode="plan",
             prompt=prompt,
@@ -285,6 +307,8 @@ def main(
         _echo_section("User Input")
         _echo_key_value("prompt", prompt, value_color="cyan")
         _echo_key_value("mode", "execute-plan", value_color="bright_cyan")
+        if project:
+            _echo_key_value("project", project, value_color="bright_green")
         outcome = _flow_execute_plan(
             prompt=prompt,
             plan_file=chosen_plan_file,
@@ -298,6 +322,8 @@ def main(
     _echo_section("User Input")
     _echo_key_value("prompt", prompt, value_color="cyan")
     _echo_key_value("mode", "do", value_color="bright_cyan")
+    if project:
+        _echo_key_value("project", project, value_color="bright_green")
     outcome = _flow_run_agent_mode(
         mode="do",
         prompt=prompt,

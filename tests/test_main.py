@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING
 
-from lag_cli.__main__ import _parse_generated_paths, _print_generated_tool_contents
+from lag_cli.__main__ import (
+    _parse_generated_paths,
+    _print_generated_tool_contents,
+    _set_current_project_env,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -29,3 +34,10 @@ def test_print_generated_tool_contents_prints_each_file_once(
     assert output.count("[Generated Tool ") == 2
     assert "print('a')" in output
     assert "print('b')" in output
+
+
+def test_set_current_project_env_sets_current_project(monkeypatch) -> None:
+    monkeypatch.delenv("CURRENT_PROJECT", raising=False)
+    project = _set_current_project_env("demo-project")
+    assert project == "demo-project"
+    assert os.environ["CURRENT_PROJECT"] == "demo-project"
