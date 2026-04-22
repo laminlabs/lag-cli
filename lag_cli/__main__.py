@@ -29,7 +29,7 @@ def _secho(
 
 
 def _echo_info(message: str) -> None:
-    _secho(f"→ {message}", fg="bright_black")
+    _secho(f"→ {message}", fg="black")
 
 
 def _echo_success(message: str) -> None:
@@ -44,9 +44,9 @@ def _echo_section(title: str) -> None:
     _secho(f"\n[{title}]", fg="bright_cyan", bold=True)
 
 
-def _echo_key_value(key: str, value: str, *, value_color: str = "white") -> None:
-    _secho("→ ", nl=False, fg="bright_black")
-    _secho(f"{key}=", nl=False, fg="bright_black")
+def _echo_key_value(key: str, value: str, *, value_color: str | None = None) -> None:
+    _secho("→ ", nl=False, fg="black")
+    _secho(f"{key}=", nl=False, fg="black")
     _secho(value, fg=value_color)
 
 
@@ -56,7 +56,7 @@ def _progress(message: str) -> None:
         _echo_info(pretty_message)
         return
     if message.startswith("prompt: "):
-        _secho("→ prompt: ", nl=False, fg="bright_black")
+        _secho("→ prompt: ", nl=False, fg="black")
         _secho(message.removeprefix("prompt: "), fg="cyan")
         return
     if message.startswith("gemini request attempt"):
@@ -78,24 +78,24 @@ def _progress(message: str) -> None:
         return
 
     step, detail = step_match.groups()
-    _secho(f"→ step {step}: ", nl=False, fg="bright_black")
+    _secho(f"→ step {step}: ", nl=False, fg="black")
     if detail.startswith("waiting for model response"):
         _secho(detail, fg="blue")
     elif detail.startswith("model text: "):
         _secho("model text: ", nl=False, fg="blue")
-        _secho(detail.removeprefix("model text: "), fg="white")
+        _secho(detail.removeprefix("model text: "))
     elif detail.startswith("tool call -> "):
         _secho("tool call -> ", nl=False, fg="magenta")
-        _secho(detail.removeprefix("tool call -> "), fg="white")
+        _secho(detail.removeprefix("tool call -> "))
     elif detail.startswith("wrote file "):
         _secho(detail, fg="green")
     elif detail.startswith("tool result status="):
         status = detail.removeprefix("tool result status=")
         color = "green" if status == "success" else "yellow"
-        _secho("tool result status=", nl=False, fg="bright_black")
+        _secho("tool result status=", nl=False, fg="black")
         _secho(status, fg=color)
     else:
-        _secho(detail, fg="white")
+        _secho(detail)
 
 
 def _parse_generated_paths(generated_paths_csv: str) -> list[Path]:
@@ -132,10 +132,10 @@ def _print_generated_tool_contents(paths: list[Path]) -> None:
             continue
         seen.add(path)
         _echo_section(f"Generated Tool {path.name}")
-        _secho(str(path), fg="bright_black")
+        _secho(str(path), fg="black")
         content = path.read_text(encoding="utf-8")
-        _secho(content, fg="white")
-        _secho("--- end generated tool ---", fg="bright_black")
+        _secho(content)
+        _secho("--- end generated tool ---", fg="black")
 
 
 def _flow_run_agent_mode(
@@ -309,7 +309,7 @@ def main(
             )
         if outcome["final_text"]:
             _echo_section("Model Output")
-            _secho(str(outcome["final_text"]), fg="white")
+            _secho(str(outcome["final_text"]))
         return
 
     chosen_plan_file = find_plan_file(plan_file)
@@ -326,7 +326,7 @@ def main(
         _echo_section("Run")
         _echo_key_value("run_uid", str(outcome["run_uid"]), value_color="green")
         _echo_key_value("plan", str(outcome["plan_path"]), value_color="magenta")
-        _secho(str(outcome["final_text"]), fg="white")
+        _secho(str(outcome["final_text"]))
         return
 
     _echo_section("User Input")
@@ -368,12 +368,12 @@ def main(
                 str(exec_outcome["run_uid"]),
                 value_color="green",
             )
-            _secho(str(exec_outcome["final_text"]), fg="white")
+            _secho(str(exec_outcome["final_text"]))
         else:
             _echo_warning("Skipped execution of newly generated tools.")
     if outcome["final_text"]:
         _echo_section("Model Output")
-        _secho(str(outcome["final_text"]), fg="white")
+        _secho(str(outcome["final_text"]))
 
 
 if __name__ == "__main__":
