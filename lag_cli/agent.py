@@ -288,6 +288,31 @@ def _dispatch_tool(
                     "Aborting without generating a new tool."
                 ),
             }
+        if (
+            run_context.mode == "do"
+            and _is_explicit_tool_key(key)
+            and result.get("results")
+        ):
+            matched_key = key
+            first_result = (
+                result.get("results", [])[0]
+                if isinstance(result.get("results"), list) and result.get("results")
+                else None
+            )
+            if isinstance(first_result, dict):
+                candidate_key = first_result.get("key")
+                if isinstance(candidate_key, str) and candidate_key.strip():
+                    matched_key = candidate_key.strip()
+            return {
+                "status": "success",
+                "run_uid": run_context.run_uid,
+                "message": (
+                    f"Found existing runnable tool '{matched_key}'. "
+                    "Skipping generation and proceeding to execution."
+                ),
+                "resolved_runnable_path": matched_key,
+                "short_circuit_execute": True,
+            }
         return result
     if name == "write_python_script":
         filename = str(
@@ -392,6 +417,8 @@ def run_agent(
     generated_files: list[str] = []
     final_text = ""
     fatal_error: str | None = None
+    resolved_runnable_path: str | None = None
+    short_circuit_execute = False
     if progress_callback is not None:
         progress_callback(f"mode={run_context.mode} model={run_context.model}")
         progress_callback(f"prompt: {run_context.prompt}")
@@ -482,6 +509,21 @@ def run_agent(
                 progress_callback(f"step {step}: tool result status={status}")
                 if status == "error" and result.get("message"):
                     progress_callback(f"step {step}: tool error: {result['message']}")
+                if result.get("short_circuit_execute") and result.get("message"):
+                    progress_callback(f"step {step}: {result['message']}")
+
+            resolved_path = result.get("resolved_runnable_path")
+            if isinstance(resolved_path, str) and resolved_path.strip():
+                resolved_runnable_path = resolved_path.strip()
+            if result.get("short_circuit_execute"):
+                short_circuit_execute = True
+                final_text = str(
+                    result.get(
+                        "message",
+                        f"Resolved runnable '{resolved_runnable_path}' for execution.",
+                    )
+                )
+                break
 
             if result.get("fatal"):
                 fatal_error = str(result.get("message", "Fatal tool error."))
@@ -490,6 +532,8 @@ def run_agent(
         if fatal_error is not None:
             final_text = fatal_error
             break
+        if short_circuit_execute:
+            break
 
     return {
         "run_uid": run_context.run_uid,
@@ -497,6 +541,7 @@ def run_agent(
         "trace_events": trace_events,
         "generated_file": generated_file,
         "generated_files": generated_files,
+        "resolved_runnable_path": resolved_runnable_path,
         "final_text": final_text,
     }
 

@@ -183,6 +183,13 @@ def run_agent_mode(
         for path_str in result.get("generated_files", [])
         if isinstance(path_str, str) and path_str
     ]
+    resolved_runnable_path = result.get("resolved_runnable_path")
+    if (
+        isinstance(resolved_runnable_path, str)
+        and resolved_runnable_path
+        and resolved_runnable_path not in generated_files
+    ):
+        generated_files.append(resolved_runnable_path)
     if mode == "plan":
         save_generated_tool_files(generated_files)
     return {

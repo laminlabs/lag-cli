@@ -217,3 +217,85 @@ def test_run_agent_stops_after_fatal_tool_error(monkeypatch) -> None:
     )
 
     assert result["final_text"] == "Tool key 'test-lag/create_fasta.py' was not found."
+
+
+def test_short_circuits_when_explicit_tool_key_found(monkeypatch) -> None:
+    run_context = RunContext(
+        run_uid="run-1",
+        mode="do",
+        prompt="rerun tool",
+        model="m",
+    )
+
+    monkeypatch.setattr(
+        "lag_cli.agent.get_lamindb_skill",
+        lambda **_kwargs: {
+            "run_uid": "run-1",
+            "results": [
+                {
+                    "type": "transform",
+                    "uid": "u1",
+                    "key": "test-lag/create_fasta.py",
+                }
+            ],
+            "searched_instances": ["laminlabs/lamindata"],
+        },
+    )
+    result = _dispatch_tool(
+        name="get_lamindb_skill",
+        args={"key": "test-lag/create_fasta.py"},
+        run_context=run_context,
+        default_output_file=Path("out.py"),
+        existing_generated_files=[],
+    )
+
+    assert result["status"] == "success"
+    assert result["short_circuit_execute"] is True
+    assert result["resolved_runnable_path"] == "test-lag/create_fasta.py"
+
+
+def test_run_agent_stops_after_short_circuit_lookup(monkeypatch) -> None:
+    run_context = RunContext(
+        run_uid="run-1",
+        mode="do",
+        prompt="rerun",
+        model="m",
+    )
+    tool_response = {
+        "candidates": [
+            {
+                "content": {
+                    "parts": [
+                        {
+                            "functionCall": {
+                                "name": "get_lamindb_skill",
+                                "args": {"key": "test-lag/create_fasta.py"},
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+    monkeypatch.setattr(
+        "lag_cli.agent._post_generate_content", lambda **_kwargs: tool_response
+    )
+    monkeypatch.setattr(
+        "lag_cli.agent._dispatch_tool",
+        lambda **_kwargs: {
+            "status": "success",
+            "short_circuit_execute": True,
+            "resolved_runnable_path": "test-lag/create_fasta.py",
+            "message": "Found existing runnable tool.",
+        },
+    )
+
+    result = run_agent(
+        api_key="dummy",
+        run_context=run_context,
+        output_file=Path("out.py"),
+        max_steps=5,
+    )
+
+    assert result["final_text"] == "Found existing runnable tool."
+    assert result["resolved_runnable_path"] == "test-lag/create_fasta.py"
