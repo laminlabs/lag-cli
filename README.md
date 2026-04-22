@@ -18,7 +18,7 @@ Make sure LaminDB is initialized and connected.
 
 ## Quick Start
 
-Run in default `do` mode:
+Run in default mode:
 
 ```bash
 lag --prompt "Write a text file with 'Hello agent!' in it, please"
@@ -26,11 +26,11 @@ lag --prompt "Write a text file with 'Hello agent!' in it, please"
 
 ## Modes
 
-### Default mode (`do`)
+### Default mode
 
 - If a plan exists (`plan.md` or latest `plan_*.md`, or `--plan-file`), `lag` executes the referenced runnable tools.
 - Otherwise, `lag` generates runnable tool file(s), shows their contents, and asks for confirmation before execution.
-- In `do` mode, generated code includes `ln.track()` / `ln.finish()` unless `--no-track` is used.
+- In default mode, generated code includes `ln.track()` / `ln.finish()` unless `--no-track` is used.
 
 ### Planning mode (`--plan`)
 

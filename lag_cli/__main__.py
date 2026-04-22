@@ -52,7 +52,8 @@ def _echo_key_value(key: str, value: str, *, value_color: str = "white") -> None
 
 def _progress(message: str) -> None:
     if message.startswith("mode="):
-        _echo_info(message)
+        pretty_message = message.replace("mode=do", "mode=default")
+        _echo_info(pretty_message)
         return
     if message.startswith("prompt: "):
         _secho("→ prompt: ", nl=False, fg="bright_black")
@@ -250,7 +251,7 @@ def _flow_execute_generated(
     "--plan-file",
     type=click.Path(path_type=Path, exists=True),
     default=None,
-    help="Optional path to plan file to execute in default do mode.",
+    help="Optional path to plan file to execute in default mode.",
 )
 @click.option(
     "--no-track",
@@ -261,7 +262,7 @@ def _flow_execute_generated(
     "--yes",
     "auto_confirm_execute",
     is_flag=True,
-    help="Auto-confirm execution of newly generated tools in default do mode.",
+    help="Auto-confirm execution of newly generated tools in default mode.",
 )
 @click.option(
     "--project",
@@ -330,7 +331,7 @@ def main(
 
     _echo_section("User Input")
     _echo_key_value("prompt", prompt, value_color="cyan")
-    _echo_key_value("mode", "do", value_color="bright_cyan")
+    _echo_key_value("mode", "default", value_color="bright_cyan")
     if project:
         _echo_key_value("project", project, value_color="bright_green")
     outcome = _flow_run_agent_mode(
