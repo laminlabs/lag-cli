@@ -227,6 +227,7 @@ def _dispatch_tool(
             code=str(args.get("code", "")),
             filename=filename,
             run_uid=run_context.run_uid,
+            track_outputs=run_context.track_outputs,
         )
     if name == "write_jupyter_notebook":
         filename = str(args.get("filename") or default_output_file)
@@ -237,6 +238,7 @@ def _dispatch_tool(
             cells=cells,
             filename=filename,
             run_uid=run_context.run_uid,
+            track_outputs=run_context.track_outputs,
         )
     if name == "write_markdown_plan":
         filename = str(args.get("filename") or default_output_file)
@@ -284,6 +286,7 @@ def run_agent(
     ]
     trace_events: list[dict[str, Any]] = []
     generated_file: str | None = None
+    generated_files: list[str] = []
     final_text = ""
     if progress_callback is not None:
         progress_callback(f"mode={run_context.mode} model={run_context.model}")
@@ -343,6 +346,8 @@ def run_agent(
             generated = result.get("file")
             if isinstance(generated, str) and generated:
                 generated_file = generated
+                if generated not in generated_files:
+                    generated_files.append(generated)
                 if progress_callback is not None:
                     progress_callback(f"step {step}: wrote file {generated}")
 
@@ -376,6 +381,7 @@ def run_agent(
         "contents": contents,
         "trace_events": trace_events,
         "generated_file": generated_file,
+        "generated_files": generated_files,
         "final_text": final_text,
     }
 

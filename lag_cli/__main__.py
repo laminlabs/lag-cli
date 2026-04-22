@@ -8,7 +8,7 @@ import lamindb as ln
 from dotenv import load_dotenv
 
 from .agent import run_agent
-from .do_executor import execute_plan, find_plan_file
+from .do_executor import execute_plan, execute_runnable_paths, find_plan_file
 from .run_context import RunContext, create_run_uid
 from .tracing import register_trace_and_outputs, save_trace_files
 
@@ -24,8 +24,14 @@ def _flow_run_agent_mode(
     output_file: Path | None,
     model: str,
     output_format: str,
-    api_key: str,
+    track_outputs: bool,
 ) -> dict[str, str | None]:
+    workspace_env_path = Path("~/llms.env").expanduser()
+    load_dotenv(dotenv_path=workspace_env_path)
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise click.ClickException("GEMINI_API_KEY not found in ~/llms.env")
+
     lamindb_run_uid = str(getattr(ln.context.run, "uid", "") or "") or None
     run_uid = create_run_uid(lamindb_run_uid)
 
@@ -39,6 +45,7 @@ def _flow_run_agent_mode(
         prompt=prompt,
         model=model,
         output_format=output_format,
+        track_outputs=track_outputs,
     )
     result = run_agent(
         api_key=api_key,
@@ -64,6 +71,7 @@ def _flow_run_agent_mode(
         "run_uid": run_uid,
         "trace_path": str(trace_txt_path),
         "generated_path": str(generated_path) if generated_path else None,
+        "generated_paths": ",".join(result.get("generated_files", [])),
         "final_text": str(result.get("final_text", "") or "").strip(),
     }
 
@@ -98,6 +106,41 @@ def _flow_execute_plan(
     }
 
 
+def _flow_execute_generated(
+    *,
+    prompt: str,
+    generated_paths_csv: str,
+) -> dict[str, str | None]:
+    lamindb_run_uid = str(getattr(ln.context.run, "uid", "") or "") or None
+    run_uid = create_run_uid(lamindb_run_uid)
+    runnable_paths = [
+        Path(path_str).resolve()
+        for path_str in generated_paths_csv.split(",")
+        if path_str.strip()
+    ]
+    result = execute_runnable_paths(
+        prompt=prompt,
+        runnable_paths=runnable_paths,
+        run_uid=run_uid,
+        source="generated_outputs",
+    )
+    trace_txt_path = Path("trace_exec.txt")
+    save_trace_files(
+        trace_payload=result,
+        trace_txt_path=trace_txt_path,
+    )
+    register_trace_and_outputs(
+        run_uid=run_uid,
+        trace_txt_path=trace_txt_path,
+        generated_file=None,
+    )
+    return {
+        "run_uid": run_uid,
+        "trace_path": str(trace_txt_path),
+        "final_text": str(result.get("final_text", "")),
+    }
+
+
 @click.command()
 @click.option("--prompt", required=True, type=str, help="User prompt.")
 @click.option(
@@ -121,6 +164,11 @@ def _flow_execute_plan(
     default=None,
     help="Optional path to plan file to execute in default do mode.",
 )
+@click.option(
+    "--no-track",
+    is_flag=True,
+    help="Disable automatic insertion of ln.track()/ln.finish() in generated scripts/notebooks.",
+)
 @ln.flow("wDJpT3xdqjY8")
 def main(
     prompt: str,
@@ -129,14 +177,9 @@ def main(
     model: str,
     output_format: str,
     plan_file: Path | None,
+    no_track: bool,
 ) -> None:
     """LAG CLI."""
-    workspace_env_path = Path("~/llms.env").expanduser()
-    load_dotenv(dotenv_path=workspace_env_path)
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        raise click.ClickException("GEMINI_API_KEY not found in ~/llms.env")
-
     if plan_mode:
         outcome = _flow_run_agent_mode(
             mode="plan",
@@ -144,7 +187,7 @@ def main(
             output_file=output_file,
             model=model,
             output_format=output_format,
-            api_key=api_key,
+            track_outputs=not no_track,
         )
         click.echo(f"run_uid={outcome['run_uid']}")
         click.echo(f"trace={outcome['trace_path']}")
@@ -173,12 +216,20 @@ def main(
         output_file=output_file,
         model=model,
         output_format="py",
-        api_key=api_key,
+        track_outputs=not no_track,
     )
     click.echo(f"run_uid={outcome['run_uid']}")
     click.echo(f"trace={outcome['trace_path']}")
     if outcome["generated_path"]:
         click.echo(f"generated={outcome['generated_path']}")
+    if outcome["generated_paths"]:
+        exec_outcome = _flow_execute_generated(
+            prompt=prompt,
+            generated_paths_csv=str(outcome["generated_paths"]),
+        )
+        click.echo(f"exec_run_uid={exec_outcome['run_uid']}")
+        click.echo(f"exec_trace={exec_outcome['trace_path']}")
+        click.echo(str(exec_outcome["final_text"]))
     if outcome["final_text"]:
         click.echo("\nFinal response:\n")
         click.echo(str(outcome["final_text"]))

@@ -37,6 +37,9 @@ Default mode (`do`):
 lag --prompt "Write a text file with 'Hello agent!' in it, please"
 ```
 
+In default mode, if no plan is found, `lag` generates runnable scripts/notebooks and then executes them automatically.
+Generated scripts/notebooks include `ln.track()`/`ln.finish()` and auto-register new output files as artifacts by default.
+
 Planning mode:
 
 ```bash
@@ -53,6 +56,12 @@ If a plan exists (`plan.md` or latest `plan_*.md`), default mode executes script
 
 ```bash
 lag --prompt "Execute the current plan" --plan-file ./plan.md
+```
+
+Disable auto-tracking code injection when needed:
+
+```bash
+lag --prompt "..." --no-track
 ```
 
 Optional flags:

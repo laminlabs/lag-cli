@@ -98,12 +98,40 @@ def _execute_notebook(notebook_path: Path) -> dict[str, Any]:
 def execute_plan(*, prompt: str, plan_file: Path, run_uid: str) -> dict[str, Any]:
     plan_text = plan_file.read_text(encoding="utf-8")
     runnable_paths = extract_runnable_paths(plan_text, plan_file.parent)
+    payload = execute_runnable_paths(
+        prompt=prompt,
+        runnable_paths=runnable_paths,
+        run_uid=run_uid,
+        source=str(plan_file),
+    )
+    if not runnable_paths:
+        payload["final_text"] = "No runnable script/notebook paths found in the plan."
+    else:
+        failed = [
+            event
+            for event in payload["trace_events"]
+            if event.get("event") in {"script_executed", "notebook_executed"}
+            and event.get("exit_code") != 0
+        ]
+        payload["final_text"] = (
+            f"Executed {len(runnable_paths)} runnables from plan; {len(failed)} failed."
+        )
+    return payload
 
+
+def execute_runnable_paths(
+    *,
+    prompt: str,
+    runnable_paths: list[Path],
+    run_uid: str,
+    source: str,
+) -> dict[str, Any]:
+    """Execute runnable python scripts/notebooks and return trace payload."""
     trace_events: list[dict[str, Any]] = [
         {
             "step": 0,
-            "event": "plan_loaded",
-            "plan_file": str(plan_file),
+            "event": "runnables_loaded",
+            "source": source,
             "prompt": prompt,
             "runnables_detected": [str(path) for path in runnable_paths],
         }
@@ -114,7 +142,7 @@ def execute_plan(*, prompt: str, plan_file: Path, run_uid: str) -> dict[str, Any
             "run_uid": run_uid,
             "trace_events": trace_events,
             "generated_file": None,
-            "final_text": "No runnable script/notebook paths found in the plan.",
+            "final_text": "No runnable script/notebook paths to execute.",
         }
 
     for idx, runnable_path in enumerate(runnable_paths, start=1):
@@ -150,7 +178,7 @@ def execute_plan(*, prompt: str, plan_file: Path, run_uid: str) -> dict[str, Any
         and event.get("exit_code") != 0
     ]
     final_text = (
-        f"Executed {len(runnable_paths)} runnables from plan; {len(failed)} failed."
+        f"Executed {len(runnable_paths)} runnables; {len(failed)} failed."
         if runnable_paths
         else "No runnables executed."
     )

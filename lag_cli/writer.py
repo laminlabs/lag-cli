@@ -1,25 +1,86 @@
 from __future__ import annotations
 
 import shutil
+import textwrap
 from pathlib import Path
 from typing import Any
 
 import nbformat
 
 
-def write_python_script(*, code: str, filename: str, run_uid: str) -> dict[str, Any]:
+def _ensure_tracked_python_code(code: str) -> str:
+    if "ln.track(" in code and "ln.finish(" in code:
+        return code
+
+    indented = textwrap.indent(code.rstrip() + "\n", "    ")
+    return (
+        "import lamindb as ln\n"
+        "from pathlib import Path\n\n"
+        "ln.track()\n"
+        "_before_files = {p.resolve() for p in Path('.').rglob('*') if p.is_file()}\n\n"
+        "try:\n"
+        f"{indented}"
+        "finally:\n"
+        "    _after_files = {p.resolve() for p in Path('.').rglob('*') if p.is_file()}\n"
+        "    for _path in sorted(_after_files - _before_files):\n"
+        "        if _path.name in {'trace.txt', 'trace_exec.txt'}:\n"
+        "            continue\n"
+        "        try:\n"
+        "            ln.Artifact(str(_path), description='Auto-tracked generated output').save()\n"
+        "        except Exception as _exc:\n"
+        "            print(f'Warning: failed to track {_path}: {_exc}')\n"
+        "    ln.finish()\n"
+    )
+
+
+def _tracking_prologue_cell() -> str:
+    return (
+        "import lamindb as ln\n"
+        "from pathlib import Path\n\n"
+        "ln.track()\n"
+        "_before_files = {p.resolve() for p in Path('.').rglob('*') if p.is_file()}\n"
+    )
+
+
+def _tracking_epilogue_cell() -> str:
+    return (
+        "_after_files = {p.resolve() for p in Path('.').rglob('*') if p.is_file()}\n"
+        "for _path in sorted(_after_files - _before_files):\n"
+        "    if _path.name in {'trace.txt', 'trace_exec.txt'}:\n"
+        "        continue\n"
+        "    try:\n"
+        "        ln.Artifact(str(_path), description='Auto-tracked generated output').save()\n"
+        "    except Exception as _exc:\n"
+        "        print(f'Warning: failed to track {_path}: {_exc}')\n"
+        "ln.finish()\n"
+    )
+
+
+def write_python_script(
+    *,
+    code: str,
+    filename: str,
+    run_uid: str,
+    track_outputs: bool = True,
+) -> dict[str, Any]:
     path = Path(filename)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(code, encoding="utf-8")
+    code_to_write = _ensure_tracked_python_code(code) if track_outputs else code
+    path.write_text(code_to_write, encoding="utf-8")
     return {
         "status": "success",
         "file": str(path),
         "run_uid": run_uid,
+        "tracking_enabled": track_outputs,
     }
 
 
 def write_jupyter_notebook(
-    *, cells: list[dict[str, str]], filename: str, run_uid: str
+    *,
+    cells: list[dict[str, str]],
+    filename: str,
+    run_uid: str,
+    track_outputs: bool = True,
 ) -> dict[str, Any]:
     path = Path(filename)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -33,6 +94,21 @@ def write_jupyter_notebook(
             nb_cells.append(nbformat.v4.new_markdown_cell(content))
         else:
             nb_cells.append(nbformat.v4.new_code_cell(content))
+    if track_outputs:
+        has_track = any(
+            "ln.track(" in str(cell.get("content", ""))
+            for cell in cells
+            if cell.get("type") == "code"
+        )
+        has_finish = any(
+            "ln.finish(" in str(cell.get("content", ""))
+            for cell in cells
+            if cell.get("type") == "code"
+        )
+        if not has_track:
+            nb_cells.insert(0, nbformat.v4.new_code_cell(_tracking_prologue_cell()))
+        if not has_finish:
+            nb_cells.append(nbformat.v4.new_code_cell(_tracking_epilogue_cell()))
     nb["cells"] = nb_cells
 
     with path.open("w", encoding="utf-8") as f:
@@ -41,6 +117,7 @@ def write_jupyter_notebook(
         "status": "success",
         "file": str(path),
         "run_uid": run_uid,
+        "tracking_enabled": track_outputs,
     }
 
 

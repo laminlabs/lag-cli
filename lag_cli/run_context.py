@@ -11,6 +11,7 @@ class RunContext:
     prompt: str
     model: str
     output_format: str
+    track_outputs: bool = True
 
 
 def create_run_uid(lamindb_run_uid: str | None = None) -> str:
