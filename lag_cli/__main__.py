@@ -17,6 +17,26 @@ def _progress(message: str) -> None:
     click.echo(f"→ {message}")
 
 
+def _parse_generated_paths(generated_paths_csv: str) -> list[Path]:
+    return [
+        Path(path_str).resolve()
+        for path_str in generated_paths_csv.split(",")
+        if path_str.strip()
+    ]
+
+
+def _print_generated_tool_contents(paths: list[Path]) -> None:
+    seen: set[Path] = set()
+    for path in paths:
+        if path in seen or not path.exists():
+            continue
+        seen.add(path)
+        click.echo(f"\n--- generated tool: {path} ---")
+        content = path.read_text(encoding="utf-8")
+        click.echo(content)
+        click.echo("--- end generated tool ---")
+
+
 def _flow_run_agent_mode(
     *,
     mode: str,
@@ -96,11 +116,7 @@ def _flow_execute_generated(
 ) -> dict[str, str | None]:
     lamindb_run_uid = str(getattr(ln.context.run, "uid", "") or "") or None
     run_uid = create_run_uid(lamindb_run_uid)
-    runnable_paths = [
-        Path(path_str).resolve()
-        for path_str in generated_paths_csv.split(",")
-        if path_str.strip()
-    ]
+    runnable_paths = _parse_generated_paths(generated_paths_csv)
     result = execute_runnable_paths(
         prompt=prompt,
         runnable_paths=runnable_paths,
@@ -141,6 +157,12 @@ def _flow_execute_generated(
     is_flag=True,
     help="Disable automatic insertion of ln.track()/ln.finish() in generated scripts/notebooks.",
 )
+@click.option(
+    "--yes",
+    "auto_confirm_execute",
+    is_flag=True,
+    help="Auto-confirm execution of newly generated tools in default do mode.",
+)
 @ln.flow("wDJpT3xdqjY8")
 def main(
     prompt: str,
@@ -150,6 +172,7 @@ def main(
     output_format: str,
     plan_file: Path | None,
     no_track: bool,
+    auto_confirm_execute: bool,
 ) -> None:
     """LAG CLI."""
     if plan_mode:
@@ -192,12 +215,22 @@ def main(
     if outcome["generated_path"]:
         click.echo(f"generated={outcome['generated_path']}")
     if outcome["generated_paths"]:
-        exec_outcome = _flow_execute_generated(
-            prompt=prompt,
-            generated_paths_csv=str(outcome["generated_paths"]),
+        generated_paths_csv = str(outcome["generated_paths"])
+        generated_paths = _parse_generated_paths(generated_paths_csv)
+        _print_generated_tool_contents(generated_paths)
+        should_execute = auto_confirm_execute or click.confirm(
+            "Execute newly generated tool files now?",
+            default=True,
         )
-        click.echo(f"exec_run_uid={exec_outcome['run_uid']}")
-        click.echo(str(exec_outcome["final_text"]))
+        if should_execute:
+            exec_outcome = _flow_execute_generated(
+                prompt=prompt,
+                generated_paths_csv=generated_paths_csv,
+            )
+            click.echo(f"exec_run_uid={exec_outcome['run_uid']}")
+            click.echo(str(exec_outcome["final_text"]))
+        else:
+            click.echo("Skipped execution of newly generated tools.")
     if outcome["final_text"]:
         click.echo("\nFinal response:\n")
         click.echo(str(outcome["final_text"]))

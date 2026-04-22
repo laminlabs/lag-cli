@@ -29,7 +29,9 @@ PLAN_SYSTEM_INSTRUCTION = (
 DO_SYSTEM_INSTRUCTION = (
     "You are a scientific coding agent. First retrieve relevant context when useful, "
     "then write runnable analysis code. For every output file your script/notebook writes, "
-    "explicitly call ln.Artifact('<output_path>').save() in the generated code."
+    "explicitly call ln.Artifact('<output_path>').save() in the generated code. "
+    "Do not create helper runner scripts that only execute other generated scripts via subprocess; "
+    "write the task directly in the produced runnable tool file(s)."
 )
 
 
