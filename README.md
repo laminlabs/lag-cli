@@ -33,7 +33,7 @@ GEMINI_API_KEY=your_api_key_here
 Generate a Python script:
 
 ```bash
-lag-cli run --task "Analyze single-cell RNA-seq data using Scanpy"
+lag run --task "Analyze single-cell RNA-seq data using Scanpy"
 ```
 
 Optional flags:
