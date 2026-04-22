@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
@@ -7,6 +8,8 @@ from pathlib import Path
 from typing import Any
 
 import nbformat
+
+RUN_UID_ENV_VAR = "LAMIN_INITIATED_BY_RUN_UID"
 
 
 def find_plan_file(explicit_plan_file: Path | None = None) -> Path | None:
@@ -55,12 +58,15 @@ def extract_runnable_paths(plan_text: str, plan_dir: Path) -> list[Path]:
     return paths
 
 
-def _execute_python(script_path: Path) -> dict[str, Any]:
+def _execute_python(script_path: Path, run_uid: str) -> dict[str, Any]:
+    env = os.environ.copy()
+    env[RUN_UID_ENV_VAR] = run_uid
     completed = subprocess.run(
         [sys.executable, str(script_path)],
         check=False,
         capture_output=True,
         text=True,
+        env=env,
     )
     return {
         "kind": "python_script",
@@ -71,21 +77,29 @@ def _execute_python(script_path: Path) -> dict[str, Any]:
     }
 
 
-def _execute_notebook(notebook_path: Path) -> dict[str, Any]:
+def _execute_notebook(notebook_path: Path, run_uid: str) -> dict[str, Any]:
     nb = nbformat.read(notebook_path, as_version=4)
     globals_ns: dict[str, Any] = {}
     outputs: list[str] = []
     errors: list[str] = []
-    for idx, cell in enumerate(nb.cells):
-        if cell.cell_type != "code":
-            continue
-        source = str(cell.source or "")
-        try:
-            exec(compile(source, str(notebook_path), "exec"), globals_ns)  # noqa: S102
-            outputs.append(f"cell_{idx}: ok")
-        except Exception as exc:
-            errors.append(f"cell_{idx}: {exc}")
-            break
+    previous_run_uid = os.environ.get(RUN_UID_ENV_VAR)
+    os.environ[RUN_UID_ENV_VAR] = run_uid
+    try:
+        for idx, cell in enumerate(nb.cells):
+            if cell.cell_type != "code":
+                continue
+            source = str(cell.source or "")
+            try:
+                exec(compile(source, str(notebook_path), "exec"), globals_ns)  # noqa: S102
+                outputs.append(f"cell_{idx}: ok")
+            except Exception as exc:
+                errors.append(f"cell_{idx}: {exc}")
+                break
+    finally:
+        if previous_run_uid is None:
+            os.environ.pop(RUN_UID_ENV_VAR, None)
+        else:
+            os.environ[RUN_UID_ENV_VAR] = previous_run_uid
     return {
         "kind": "notebook",
         "path": str(notebook_path),
@@ -157,10 +171,10 @@ def execute_runnable_paths(
             continue
 
         if runnable_path.suffix == ".ipynb":
-            execution = _execute_notebook(runnable_path)
+            execution = _execute_notebook(runnable_path, run_uid)
             event = "notebook_executed"
         else:
-            execution = _execute_python(runnable_path)
+            execution = _execute_python(runnable_path, run_uid)
             event = "script_executed"
 
         trace_events.append(
