@@ -118,29 +118,22 @@ def test_defaults_notebook_extension_by_tool_type(monkeypatch) -> None:
     assert captured["filename"] == "plan_run.ipynb"
 
 
-def test_defaults_markdown_extension_by_tool_type(monkeypatch) -> None:
+def test_plan_mode_enforces_explicit_key_filename_reuse() -> None:
     run_context = RunContext(
         run_uid="run-1",
         mode="plan",
-        prompt="p",
+        prompt="make new version of test-lag/create_fasta.py",
         model="m",
     )
-    captured: dict[str, str] = {}
-
-    def _fake_write_markdown_plan(**kwargs):
-        captured["filename"] = str(kwargs["filename"])
-        return {"status": "success", "file": str(kwargs["filename"])}
-
-    monkeypatch.setattr("lag_cli.agent.write_markdown_plan", _fake_write_markdown_plan)
-    _dispatch_tool(
-        name="write_markdown_plan",
-        args={"markdown": "# Plan"},
+    result = _dispatch_tool(
+        name="write_python_script",
+        args={"filename": "create_fasta_albumin.py", "code": "print('x')"},
         run_context=run_context,
         default_output_file=Path("analysis.py"),
         existing_generated_files=[],
     )
-    assert captured["filename"].endswith(".md")
-    assert captured["filename"] == "analysis.md"
+    assert result["status"] == "error"
+    assert "Update that exact file" in str(result["message"])
 
 
 def test_fails_fast_when_explicit_tool_key_not_found_in_do_mode(monkeypatch) -> None:

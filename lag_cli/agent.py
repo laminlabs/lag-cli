@@ -12,7 +12,6 @@ from .context import get_lamindb_skill, get_local_skill
 from .writer import (
     write_from_template,
     write_jupyter_notebook,
-    write_markdown_plan,
     write_python_script,
 )
 
@@ -22,9 +21,10 @@ if TYPE_CHECKING:
     from .run_context import RunContext
 
 PLAN_SYSTEM_INSTRUCTION = (
-    "You are a planning and generation agent. For each prompt, you may read skills, "
-    "query LaminDB, write markdown plans, generate scripts/notebooks from scratch, "
-    "or create outputs from templates."
+    "You are a tool authoring agent. In --plan mode, create or update runnable "
+    "tool files (.py/.ipynb) that satisfy the prompt. If the prompt references an "
+    "explicit tool key/path, update that exact file instead of creating a new name. "
+    "You may read skills/query LaminDB for context, but do not write markdown plans."
 )
 
 DO_SYSTEM_INSTRUCTION = (
@@ -64,33 +64,19 @@ def _function_declarations(mode: str) -> list[dict[str, Any]]:
         },
     ]
     if mode == "plan":
-        declarations.extend(
-            [
-                {
-                    "name": "write_markdown_plan",
-                    "description": "Write a markdown planning document.",
-                    "parameters": {
-                        "type": "OBJECT",
-                        "properties": {
-                            "filename": {"type": "STRING"},
-                            "markdown": {"type": "STRING"},
-                        },
-                        "required": ["filename", "markdown"],
+        declarations.append(
+            {
+                "name": "write_from_template",
+                "description": "Create a file from an existing template path.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "template_path": {"type": "STRING"},
+                        "filename": {"type": "STRING"},
                     },
+                    "required": ["template_path", "filename"],
                 },
-                {
-                    "name": "write_from_template",
-                    "description": "Create a file from an existing template path.",
-                    "parameters": {
-                        "type": "OBJECT",
-                        "properties": {
-                            "template_path": {"type": "STRING"},
-                            "filename": {"type": "STRING"},
-                        },
-                        "required": ["template_path", "filename"],
-                    },
-                },
-            ]
+            }
         )
     if mode == "plan":
         declarations.append(
@@ -181,10 +167,21 @@ def _is_explicit_tool_key(key: str) -> bool:
     return stripped.endswith(".py") or stripped.endswith(".ipynb")
 
 
+def _extract_explicit_tool_keys(text: str) -> list[str]:
+    keys: list[str] = []
+    seen: set[str] = set()
+    for match in re.findall(r"([A-Za-z0-9_./-]+\.(?:py|ipynb))", text):
+        key = match.strip()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        keys.append(key)
+    return keys
+
+
 def _default_filename_for_tool(tool_name: str, default_output_file: Path) -> str:
     suffix_by_tool = {
         "write_python_script": ".py",
-        "write_markdown_plan": ".md",
         "write_jupyter_notebook": ".ipynb",
     }
     expected_suffix = suffix_by_tool.get(tool_name)
@@ -319,6 +316,18 @@ def _dispatch_tool(
             args.get("filename") or ""
         ).strip() or _default_filename_for_tool(name, default_output_file)
         code = str(args.get("code", ""))
+        if run_context.mode == "plan":
+            explicit_keys = _extract_explicit_tool_keys(run_context.prompt)
+            if len(explicit_keys) == 1 and filename != explicit_keys[0]:
+                return {
+                    "status": "error",
+                    "message": (
+                        "Prompt references explicit tool key "
+                        f"'{explicit_keys[0]}'. Update that exact file instead of "
+                        f"creating '{filename}'."
+                    ),
+                    "run_uid": run_context.run_uid,
+                }
         if run_context.mode == "do":
             existing_runnables = [
                 path_str
@@ -357,6 +366,18 @@ def _dispatch_tool(
         filename = str(
             args.get("filename") or ""
         ).strip() or _default_filename_for_tool(name, default_output_file)
+        if run_context.mode == "plan":
+            explicit_keys = _extract_explicit_tool_keys(run_context.prompt)
+            if len(explicit_keys) == 1 and filename != explicit_keys[0]:
+                return {
+                    "status": "error",
+                    "message": (
+                        "Prompt references explicit tool key "
+                        f"'{explicit_keys[0]}'. Update that exact file instead of "
+                        f"creating '{filename}'."
+                    ),
+                    "run_uid": run_context.run_uid,
+                }
         cells = args.get("cells")
         if not isinstance(cells, list):
             cells = [{"type": "code", "content": ""}]
@@ -365,15 +386,6 @@ def _dispatch_tool(
             filename=filename,
             run_uid=run_context.run_uid,
             track_outputs=run_context.track_outputs,
-        )
-    if name == "write_markdown_plan":
-        filename = str(
-            args.get("filename") or ""
-        ).strip() or _default_filename_for_tool(name, default_output_file)
-        return write_markdown_plan(
-            markdown=str(args.get("markdown", "")),
-            filename=filename,
-            run_uid=run_context.run_uid,
         )
     if name == "write_from_template":
         filename = str(args.get("filename") or default_output_file)

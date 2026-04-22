@@ -7,12 +7,15 @@ import click
 
 
 def save_generated_tool_files(paths: list[str]) -> None:
+    allowed_suffixes = {".py", ".ipynb"}
     seen: set[str] = set()
     for path_str in paths:
         if not path_str or path_str in seen:
             continue
         seen.add(path_str)
         path = Path(path_str)
+        if path.suffix.lower() not in allowed_suffixes:
+            continue
         if not path.exists():
             continue
         completed = subprocess.run(

@@ -1,6 +1,6 @@
 # Lag: Lamin's Agent CLI
 
-`lag` can retrieve or generate scripts (`.py`), notebooks (`.ipynb`), and skills & plans (`.md`) and then perform work with these tools.
+`lag` can execute existing runnable tools and author/update runnable scripts (`.py`) and notebooks (`.ipynb`).
 
 ## Setup
 
@@ -34,10 +34,10 @@ lag --prompt "Write a text file with 'Hello agent!' in it, please"
 
 ### Planning mode (`--plan`)
 
-Generate or update tools (without executing them):
+Generate or update runnable tools (without executing them):
 
 ```bash
-lag --plan --prompt "Write a plan for this analysis"
+lag --plan --prompt "Update test-lag/create_fasta.py with another protein"
 ```
 
 Generated/updated tool files are saved via `lamin save` in plan mode.
