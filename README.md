@@ -29,30 +29,36 @@ GEMINI_API_KEY=your_api_key_here
 
 3. Ensure LaminDB is initialized/connected for your target instance.
 
-## Commands
+## Usage
 
-Create a markdown plan:
+Default mode (`do`):
 
 ```bash
-lag plan run --prompt "Create a plan for single-cell RNA-seq analysis"
+lag --prompt "Write a text file with 'Hello agent!' in it, please"
 ```
 
-Create a Python script from a prompt:
+Planning mode:
 
 ```bash
-lag plan run --prompt "Write a Scanpy analysis script" --output-format py
+lag --plan --prompt "Please make a plan for analyzing the pbmc3k dataset"
 ```
 
-Execute scripts referenced in an existing plan:
+Optional: choose output type in planning mode:
 
 ```bash
-lag do run --prompt "Execute this plan" --plan-file ./plan.md
+lag --plan --prompt "Write a Scanpy analysis script" --output-format py
+```
+
+If a plan exists (`plan.md` or latest `plan_*.md`), default mode executes scripts/notebooks listed in the plan. You can also pass one explicitly:
+
+```bash
+lag --prompt "Execute the current plan" --plan-file ./plan.md
 ```
 
 Optional flags:
 
 - `--model gemini-2.5-flash`
-- `--output-file my_analysis.py` (plan group only)
+- `--output-file my_analysis.py`
 
 ## Notes
 
