@@ -286,11 +286,6 @@ def main(
     """LAG CLI."""
     _warn_if_missing_project(project)
     if plan_mode:
-        _echo_section("User Input")
-        _echo_key_value("prompt", prompt, value_color="cyan")
-        _echo_key_value("mode", "plan", value_color="bright_cyan")
-        if project:
-            _echo_key_value("project", project, value_color="bright_green")
         outcome = _flow_run_agent_mode(
             mode="plan",
             prompt=prompt,
@@ -314,11 +309,6 @@ def main(
 
     chosen_plan_file = find_plan_file(plan_file)
     if chosen_plan_file is not None:
-        _echo_section("User Input")
-        _echo_key_value("prompt", prompt, value_color="cyan")
-        _echo_key_value("mode", "execute-plan", value_color="bright_cyan")
-        if project:
-            _echo_key_value("project", project, value_color="bright_green")
         outcome = _flow_execute_plan(
             prompt=prompt,
             plan_file=chosen_plan_file,
@@ -329,11 +319,6 @@ def main(
         _secho(str(outcome["final_text"]))
         return
 
-    _echo_section("User Input")
-    _echo_key_value("prompt", prompt, value_color="cyan")
-    _echo_key_value("mode", "default", value_color="bright_cyan")
-    if project:
-        _echo_key_value("project", project, value_color="bright_green")
     outcome = _flow_run_agent_mode(
         mode="do",
         prompt=prompt,
