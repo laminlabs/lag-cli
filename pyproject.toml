@@ -11,6 +11,9 @@ dynamic = ["version", "description"]
 dependencies = [
     "click",
     "lamindb-core",
+    "numpy",
+    "pandas",
+    "pandera",
     "nbformat",
     "python-dotenv",
     "requests",
