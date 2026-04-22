@@ -24,9 +24,10 @@ def _secho(
     *,
     fg: str | None = None,
     bold: bool = False,
+    dim: bool = False,
     nl: bool = True,
 ) -> None:
-    click.secho(message, fg=fg, bold=bold, nl=nl, color=_COLOR_ENABLED)
+    click.secho(message, fg=fg, bold=bold, dim=dim, nl=nl, color=_COLOR_ENABLED)
 
 
 def _echo_info(message: str) -> None:
@@ -86,10 +87,10 @@ def _progress(message: str) -> None:
     _secho(f"→ step {step}: ", nl=False, fg="black")
     if detail.startswith("model text: "):
         _secho("model text: ", nl=False, fg="blue")
-        _secho(detail.removeprefix("model text: "))
+        _secho(detail.removeprefix("model text: "), dim=True)
     elif detail.startswith("tool call -> "):
         _secho("tool call -> ", nl=False, fg="magenta")
-        _secho(detail.removeprefix("tool call -> "))
+        _secho(detail.removeprefix("tool call -> "), dim=True)
     elif detail.startswith("wrote file "):
         _secho(detail, fg="green")
     elif detail.startswith("tool result status="):
@@ -98,7 +99,7 @@ def _progress(message: str) -> None:
         _secho("tool result status=", nl=False, fg="black")
         _secho(status, fg=color)
     else:
-        _secho(detail)
+        _secho(detail, dim=True)
 
 
 def _parse_generated_paths(generated_paths_csv: str) -> list[Path]:
@@ -137,7 +138,7 @@ def _print_generated_tool_contents(paths: list[Path]) -> None:
         _echo_section(f"Generated Tool {path.name}")
         _secho(str(path), fg="black")
         content = path.read_text(encoding="utf-8")
-        _secho(content)
+        _secho(content, dim=True)
         _secho("--- end generated tool ---", fg="black")
 
 
@@ -296,7 +297,7 @@ def main(
             )
         if outcome["final_text"]:
             _echo_section("Model Output")
-            _secho(str(outcome["final_text"]))
+            _secho(str(outcome["final_text"]), dim=True)
         return
 
     chosen_plan_file = find_plan_file(plan_file)
@@ -308,7 +309,7 @@ def main(
         _echo_section("Run")
         _echo_key_value("run_uid", str(outcome["run_uid"]), value_color="green")
         _echo_key_value("plan", str(outcome["plan_path"]), value_color="magenta")
-        _secho(str(outcome["final_text"]))
+        _secho(str(outcome["final_text"]), dim=True)
         return
 
     outcome = run_agent_mode(
@@ -344,12 +345,12 @@ def main(
                 str(exec_outcome["run_uid"]),
                 value_color="green",
             )
-            _secho(str(exec_outcome["final_text"]))
+            _secho(str(exec_outcome["final_text"]), dim=True)
         else:
             _echo_warning("Skipped execution of newly generated tools.")
     if outcome["final_text"]:
         _echo_section("Model Output")
-        _secho(str(outcome["final_text"]))
+        _secho(str(outcome["final_text"]), dim=True)
 
 
 if __name__ == "__main__":
