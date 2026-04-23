@@ -1,3 +1,5 @@
+⚠️ This repo is in development right now. ⚠️
+
 # Lag: Lamin's Agent CLI
 
 `lag` can execute existing runnable tools and author/update runnable scripts (`.py`) and notebooks (`.ipynb`).
