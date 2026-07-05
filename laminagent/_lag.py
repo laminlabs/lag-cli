@@ -754,22 +754,11 @@ def lag() -> None:
     """LAG CLI."""
 
 
-@lag.command("prompt")
-@click.argument("prompt", type=str)
-@click.option("--model", type=str, default="gemini-flash-latest", show_default=True)
-@click.option(
-    "--project",
-    type=str,
-    default=None,
-    callback=_project_option_callback,
-    help="Project name to set as LAMIN_CURRENT_PROJECT for the initiated run.",
-)
-@click.option(
-    "--gemini-api-key",
-    type=str,
-    default=None,
-    help="Temporary override for GEMINI_API_KEY.",
-)
+# Keep Lambda and CLI entrypoints separate:
+# - Lambda calls `lamin_executable_prompt(**function_kwargs)` directly.
+# - If Click decorators are attached to this function, it becomes a Click command
+#   object and Lambda invocation fails (e.g. unexpected keyword argument errors).
+# Do not move Click decorators back onto this function.
 @ln.flow("wDJpT3xdqjY8")
 def lamin_executable_prompt(
     prompt: str,
@@ -863,6 +852,37 @@ def lamin_executable_prompt(
     if outcome["final_text"]:
         _echo_section("Notes")
         _secho(str(outcome["final_text"]), dim=True)
+
+
+@lag.command("prompt")
+@click.argument("prompt", type=str)
+@click.option("--model", type=str, default="gemini-flash-latest", show_default=True)
+@click.option(
+    "--project",
+    type=str,
+    default=None,
+    callback=_project_option_callback,
+    help="Project name to set as LAMIN_CURRENT_PROJECT for the initiated run.",
+)
+@click.option(
+    "--gemini-api-key",
+    type=str,
+    default=None,
+    help="Temporary override for GEMINI_API_KEY.",
+)
+def prompt_command(
+    prompt: str,
+    model: str,
+    project: str | None,
+    gemini_api_key: str | None,
+) -> None:
+    """CLI wrapper around Lamin executable prompt."""
+    lamin_executable_prompt(
+        prompt=prompt,
+        model=model,
+        project=project,
+        gemini_api_key=gemini_api_key,
+    )
 
 
 @lag.command("setup")
