@@ -23,7 +23,7 @@ Make sure LaminDB is initialized and connected.
 Run with auto flow:
 
 ```bash
-lag --prompt "Write a text file with 'Hello agent!' in it, please"
+lag prompt "Write a text file with 'Hello agent!' in it, please"
 ```
 
 You can explore runnable example scenarios in `tests/tasks`.
@@ -40,7 +40,7 @@ If these records are missing, `lag` still runs; run `lag setup` when you also wa
 
 `lag` decides behavior from prompt and local context:
 
-- If `--prompt` includes explicit runnable `.py` keys/paths, `lag` executes those scripts.
+- If `prompt` includes explicit runnable `.py` keys/paths, `lag` executes those scripts.
 - Otherwise, if `tool.md` (or latest `tool_*.md`) exists, `lag` executes scripts referenced there.
 - Otherwise, `lag` invokes LLM authoring to create/update a runnable `.py` script and saves it via `ln.Transform`.
 

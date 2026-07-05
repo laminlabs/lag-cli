@@ -756,8 +756,13 @@ def execute_existing_from_prompt(prompt: str) -> dict[str, Any]:
     }
 
 
-@click.group(name="lag", invoke_without_command=True)
-@click.option("--prompt", required=False, type=str, help="User prompt.")
+@click.group(name="lag")
+def lamin_executable_lag() -> None:
+    """LAG CLI."""
+
+
+@lamin_executable_lag.command("prompt")
+@click.argument("prompt", type=str)
 @click.option(
     "--output-file",
     type=click.Path(path_type=Path),
@@ -784,23 +789,15 @@ def execute_existing_from_prompt(prompt: str) -> dict[str, Any]:
     help="Temporary override for GEMINI_API_KEY.",
 )
 @ln.flow("wDJpT3xdqjY8")
-def lamin_executable_lag(
-    prompt: str | None,
+def lamin_executable_prompt(
+    prompt: str,
     output_file: Path | None,
     model: str,
     no_track: bool,
     project: str | None,
     gemini_api_key: str | None,
 ) -> None:
-    """LAG CLI."""
-    ctx = click.get_current_context()
-    if ctx.invoked_subcommand is not None:
-        return
-
-    if not prompt:
-        raise click.UsageError(
-            "`--prompt` is required for lag; use `lag setup` to initialize setup records."
-        )
+    """Run prompt-driven LaminAgent execution."""
     prompt_text = prompt
 
     _warn_if_missing_project(project)
