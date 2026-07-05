@@ -4,6 +4,7 @@ import json
 import os
 import re
 import subprocess
+import tempfile
 import time
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -44,6 +45,7 @@ _USAGE_FEATURES_NAMES = (
     "n_output_tokens",
     "n_total_tokens",
 )
+_LAMBDA_TMP_DIR = Path(tempfile.gettempdir())
 _TRACE_REDACT_KEYS = {
     "api_key",
     "apikey",
@@ -55,6 +57,20 @@ _TRACE_REDACT_KEYS = {
     "secret",
     "x-goog-api-key",
 }
+
+
+def _is_aws_lambda_runtime() -> bool:
+    return bool(os.getenv("AWS_LAMBDA_FUNCTION_NAME") or os.getenv("LAMBDA_TASK_ROOT"))
+
+
+def _resolve_writable_path(path: Path) -> Path:
+    if not _is_aws_lambda_runtime():
+        return path
+    if path.is_absolute():
+        if path == _LAMBDA_TMP_DIR or _LAMBDA_TMP_DIR in path.parents:
+            return path
+        return _LAMBDA_TMP_DIR / path.as_posix().lstrip("/")
+    return _LAMBDA_TMP_DIR / path
 
 
 def _secho(
@@ -466,7 +482,7 @@ def _materialize_transform_source(key: str) -> Path | None:
             f"Found transform '{key}' but no executable source code was available."
         )
 
-    output_path = Path(key).resolve()
+    output_path = _resolve_writable_path(Path(key)).resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(source_code, encoding="utf-8")
     return output_path
@@ -675,40 +691,68 @@ def run_agent_authoring(
     )
     start = time.perf_counter()
     progress_callback: Callable[[str], None] | None = _progress_verbose_live()
+    previous_cwd = Path.cwd()
+    if _is_aws_lambda_runtime():
+        _LAMBDA_TMP_DIR.mkdir(parents=True, exist_ok=True)
+        os.chdir(_LAMBDA_TMP_DIR)
     try:
-        result = run_agent(
-            api_key=api_key,
-            run_context=run_context,
-            progress_callback=progress_callback,
-        )
-    except Exception as exc:
-        raise click.ClickException(str(exc)) from exc
-    elapsed = time.perf_counter() - start
+        try:
+            result = run_agent(
+                api_key=api_key,
+                run_context=run_context,
+                progress_callback=progress_callback,
+            )
+        except Exception as exc:
+            raise click.ClickException(str(exc)) from exc
+        elapsed = time.perf_counter() - start
+        active_cwd = Path.cwd()
 
-    generated_file = result.get("generated_file")
-    generated_files = [
-        path_str
-        for path_str in result.get("generated_files", [])
-        if isinstance(path_str, str) and path_str
-    ]
-    resolved_runnable_path = result.get("resolved_runnable_path")
-    if (
-        isinstance(resolved_runnable_path, str)
-        and resolved_runnable_path
-        and resolved_runnable_path not in generated_files
-    ):
-        generated_files.append(resolved_runnable_path)
-    for generated_file in generated_files:
-        ln.Transform.from_path(generated_file).save()
-    return {
-        "run_uid": run_uid,
-        "generated_path": generated_file if isinstance(generated_file, str) else None,
-        "generated_paths": ",".join(generated_files),
-        "final_text": str(result.get("final_text", "") or "").strip(),
-        "llm_usage": _normalize_gemini_usage(result.get("llm_usage")),
-        "duration_in_sec": elapsed,
-        "trace_events": result.get("trace_events", []),
-    }
+        generated_path = result.get("generated_file")
+        generated_files: list[str] = []
+        for path_str in result.get("generated_files", []):
+            if not isinstance(path_str, str) or not path_str:
+                continue
+            candidate = Path(path_str)
+            normalized = str(
+                candidate.resolve()
+                if candidate.is_absolute()
+                else (active_cwd / candidate).resolve()
+            )
+            if normalized not in generated_files:
+                generated_files.append(normalized)
+        resolved_runnable_path = result.get("resolved_runnable_path")
+        if isinstance(resolved_runnable_path, str) and resolved_runnable_path:
+            candidate = Path(resolved_runnable_path)
+            resolved_normalized = str(
+                candidate.resolve()
+                if candidate.is_absolute()
+                else (active_cwd / candidate).resolve()
+            )
+            if resolved_normalized not in generated_files:
+                generated_files.append(resolved_normalized)
+        for generated_file in generated_files:
+            ln.Transform.from_path(generated_file).save()
+
+        generated_path_normalized = None
+        if isinstance(generated_path, str) and generated_path:
+            path_candidate = Path(generated_path)
+            generated_path_normalized = str(
+                path_candidate.resolve()
+                if path_candidate.is_absolute()
+                else (active_cwd / path_candidate).resolve()
+            )
+
+        return {
+            "run_uid": run_uid,
+            "generated_path": generated_path_normalized,
+            "generated_paths": ",".join(generated_files),
+            "final_text": str(result.get("final_text", "") or "").strip(),
+            "llm_usage": _normalize_gemini_usage(result.get("llm_usage")),
+            "duration_in_sec": elapsed,
+            "trace_events": result.get("trace_events", []),
+        }
+    finally:
+        os.chdir(previous_cwd)
 
 
 def execute_the_tool(
