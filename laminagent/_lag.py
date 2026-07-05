@@ -773,9 +773,9 @@ def lag() -> None:
 @ln.flow("wDJpT3xdqjY8")
 def lamin_executable_prompt(
     prompt: str,
-    model: str,
-    project: str | None,
-    gemini_api_key: str | None,
+    model: str = "gemini-flash-latest",
+    project: str | None = None,
+    gemini_api_key: str | None = None,
 ) -> None:
     """Run prompt-driven LaminAgent execution."""
     prompt_text = prompt
