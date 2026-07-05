@@ -28,7 +28,6 @@ except ImportError:  # pragma: no cover - optional fallback
 
 from laminagent._agent import run_agent
 from laminagent._do_executor import execute_runnable_paths, execute_tool, find_tool_file
-from laminagent._output_saver import save_generated_tool_files
 from laminagent._run_context import RunContext, create_run_uid
 from laminagent._setup import get_task, normalize_task_name, setup
 
@@ -703,7 +702,8 @@ def run_agent_authoring(
         and resolved_runnable_path not in generated_files
     ):
         generated_files.append(resolved_runnable_path)
-    save_generated_tool_files(generated_files)
+    for generated_file in generated_files:
+        ln.Transform.from_path(generated_file).save()
     return {
         "run_uid": run_uid,
         "generated_path": generated_file if isinstance(generated_file, str) else None,
