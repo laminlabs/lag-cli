@@ -26,11 +26,11 @@ except ImportError:  # pragma: no cover - optional fallback
     Text = None  # type: ignore[assignment]
     _RICH_AVAILABLE = False
 
-from ._agent import run_agent
-from ._do_executor import execute_runnable_paths, execute_tool, find_tool_file
-from ._output_saver import save_generated_tool_files
-from ._run_context import RunContext, create_run_uid
-from ._setup import get_task, normalize_task_name, setup
+from laminagent._agent import run_agent
+from laminagent._do_executor import execute_runnable_paths, execute_tool, find_tool_file
+from laminagent._output_saver import save_generated_tool_files
+from laminagent._run_context import RunContext, create_run_uid
+from laminagent._setup import get_task, normalize_task_name, setup
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -753,7 +753,7 @@ def execute_existing_from_prompt(prompt: str) -> dict[str, Any]:
     }
 
 
-@click.group(invoke_without_command=True)
+@click.group(name="lag", invoke_without_command=True)
 @click.option("--prompt", required=False, type=str, help="User prompt.")
 @click.option(
     "--output-file",
@@ -775,7 +775,7 @@ def execute_existing_from_prompt(prompt: str) -> dict[str, Any]:
     help="Project name to set as LAMIN_CURRENT_PROJECT for the initiated run.",
 )
 @ln.flow("wDJpT3xdqjY8")
-def lag(
+def lamin_executable_lag(
     prompt: str | None,
     output_file: Path | None,
     model: str,
@@ -879,12 +879,12 @@ def lag(
         _secho(str(outcome["final_text"]), dim=True)
 
 
-@lag.command("setup")
+@lamin_executable_lag.command("setup")
 @click.argument(
     "script",
     required=False,
     type=click.Path(path_type=Path, exists=True),
 )
 def setup_command(script: Path | None) -> None:
-    """Set up LagEval registry and schema."""
+    """Set up LaminAgentEvals registry and schema."""
     setup(script=script)

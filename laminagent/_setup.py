@@ -6,8 +6,8 @@ import lamindb as ln
 from lamin_utils import logger
 
 SETUP_SCHEMA_NAME = "lag_eval"
-SETUP_REGISTRY_NAME = "LagEval"
-USAGE_FEATURE_TYPE_NAME = "LagEval"
+SETUP_REGISTRY_NAME = "LaminAgentEvals"
+USAGE_FEATURE_TYPE_NAME = "LaminAgentEvals"
 
 _BASE_FEATURE_DTYPES: dict[str, type | str] = {
     "package_version": str,
@@ -38,7 +38,7 @@ def _get_or_create_usage_feature_type() -> ln.Feature:
     if feature_type is None:
         feature_type = ln.Feature(
             name=USAGE_FEATURE_TYPE_NAME,
-            description="Auto-generated features tracking LagEval usage",
+            description="Auto-generated features tracking LaminAgentEvals usage",
             is_type=True,
         ).save()
     return feature_type
@@ -159,6 +159,6 @@ def setup(
 
     if verbose:
         logger.important(
-            "Configured LagEval registry without a schema and "
+            "Configured LaminAgentEvals registry without a schema and "
             f"{len(task_basenames)} task registries in schema '{schema.name}'."
         )
