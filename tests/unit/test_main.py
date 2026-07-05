@@ -45,6 +45,13 @@ def _bypass_prompt_flow_wrapper(monkeypatch) -> None:
 
     monkeypatch.setattr(lag.commands["prompt"], "callback", _callback_without_flow)
 
+    from laminagent import _lag as lag_module
+
+    flow_callback = lag_module.lamin_executable_prompt
+    while hasattr(flow_callback, "__wrapped__"):
+        flow_callback = flow_callback.__wrapped__
+    monkeypatch.setattr(lag_module, "lamin_executable_prompt", flow_callback)
+
 
 def test_parse_generated_paths_filters_empty_entries(tmp_path: Path) -> None:
     a = tmp_path / "a.py"
