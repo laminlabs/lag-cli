@@ -888,3 +888,6 @@ def lamin_executable_lag(
 def setup_command(script: Path | None) -> None:
     """Set up LaminAgentEvals registry and schema."""
     setup(script=script)
+
+
+lag = lamin_executable_lag
