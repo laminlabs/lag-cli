@@ -653,7 +653,6 @@ def _current_package_version() -> str:
 def run_agent_authoring(
     *,
     prompt: str,
-    output_file: Path | None,
     model: str,
     gemini_api_key: str | None = None,
 ) -> dict[str, Any]:
@@ -669,8 +668,7 @@ def run_agent_authoring(
     run_uid = create_run_uid(lamindb_run_uid)
 
     suffix = "py"
-    default_name = f"author_{run_uid}.{suffix}"
-    output_path = output_file or Path(default_name)
+    output_path = Path(f"author_{run_uid}.{suffix}")
 
     run_context = RunContext(
         run_uid=run_uid,
@@ -756,18 +754,12 @@ def execute_existing_from_prompt(prompt: str) -> dict[str, Any]:
 
 
 @click.group(name="lag")
-def lamin_executable_lag() -> None:
+def lag() -> None:
     """LAG CLI."""
 
 
-@lamin_executable_lag.command("prompt")
+@lag.command("prompt")
 @click.argument("prompt", type=str)
-@click.option(
-    "--output-file",
-    type=click.Path(path_type=Path),
-    default=None,
-    help="Optional output filename when authoring a new script.",
-)
 @click.option("--model", type=str, default="gemini-flash-latest", show_default=True)
 @click.option(
     "--project",
@@ -785,7 +777,6 @@ def lamin_executable_lag() -> None:
 @ln.flow("wDJpT3xdqjY8")
 def lamin_executable_prompt(
     prompt: str,
-    output_file: Path | None,
     model: str,
     project: str | None,
     gemini_api_key: str | None,
@@ -840,7 +831,6 @@ def lamin_executable_prompt(
 
     outcome = run_agent_authoring(
         prompt=prompt_text,
-        output_file=output_file,
         model=model,
         gemini_api_key=gemini_api_key,
     )
@@ -879,7 +869,7 @@ def lamin_executable_prompt(
         _secho(str(outcome["final_text"]), dim=True)
 
 
-@lamin_executable_lag.command("setup")
+@lag.command("setup")
 @click.argument(
     "script",
     required=False,
@@ -888,6 +878,3 @@ def lamin_executable_prompt(
 def setup_command(script: Path | None) -> None:
     """Set up LaminAgentEvals registry and schema."""
     setup(script=script)
-
-
-lag = lamin_executable_lag
