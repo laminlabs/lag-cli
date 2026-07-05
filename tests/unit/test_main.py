@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import os
 import re
-from typing import TYPE_CHECKING
+import tempfile
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from click.testing import CliRunner
@@ -17,10 +19,8 @@ from laminagent._lag import (
     _set_current_project_env,
     _warn_if_missing_project,
     lag,
+    run_agent_authoring,
 )
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 @pytest.fixture(autouse=True)
@@ -194,6 +194,61 @@ def test_lag_auto_authoring_runs_without_verbose_option(monkeypatch) -> None:
     result = runner.invoke(lag, ["prompt", "build tool"])
 
     assert result.exit_code == 0
+
+
+def test_run_agent_authoring_uses_tmp_cwd_on_lambda(monkeypatch) -> None:
+    original_cwd = Path.cwd()
+    tmp_realpath = Path(tempfile.gettempdir()).resolve()
+    call_cwd: dict[str, str] = {}
+
+    def _fake_run_agent(**_kwargs):
+        call_cwd["value"] = str(Path.cwd().resolve())
+        return {
+            "generated_file": "generated.py",
+            "generated_files": ["generated.py"],
+            "resolved_runnable_path": "",
+            "final_text": "ok",
+            "llm_usage": {
+                "n_call_count": 0,
+                "n_prompt_tokens": 0,
+                "n_output_tokens": 0,
+                "n_total_tokens": 0,
+            },
+            "trace_events": [],
+        }
+
+    class _FakeTransform:
+        saved_paths: list[str] = []
+
+        def __init__(self, path: str) -> None:
+            self.path = path
+
+        def save(self):
+            _FakeTransform.saved_paths.append(self.path)
+            return self
+
+    monkeypatch.setattr("laminagent._lag.load_dotenv", lambda **_kwargs: None)
+    monkeypatch.setenv("AWS_LAMBDA_FUNCTION_NAME", "laminagent-test")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr("laminagent._lag.run_agent", _fake_run_agent)
+    monkeypatch.setattr(
+        "laminagent._lag.ln.context",
+        SimpleNamespace(run=None),
+    )
+    monkeypatch.setattr(
+        "laminagent._lag.ln.Transform",
+        SimpleNamespace(from_path=lambda path: _FakeTransform(path)),
+    )
+
+    outcome = run_agent_authoring(prompt="build tool", model="gemini-flash-latest")
+
+    assert call_cwd["value"] == str(tmp_realpath)
+    assert Path.cwd() == original_cwd
+    assert isinstance(outcome["generated_path"], str)
+    assert str(Path(str(outcome["generated_path"])).resolve()) == str(
+        Path(tmp_realpath) / "generated.py"
+    )
+    assert _FakeTransform.saved_paths == [str(outcome["generated_path"])]
 
 
 def test_lag_rejects_less_verbose_flag() -> None:
