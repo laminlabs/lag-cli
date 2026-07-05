@@ -123,7 +123,9 @@ def test_setup_creates_eval_registry_with_expected_schema(monkeypatch) -> None:
         "n_output_tokens",
         "n_total_tokens",
     }
-    usage_feature_type = FakeFeature.filter(name="LagEval", is_type=True).one_or_none()
+    usage_feature_type = FakeFeature.filter(
+        name="LaminAgentEvals", is_type=True
+    ).one_or_none()
     assert usage_feature_type is not None
     for usage_key in (
         "n_call_count",
