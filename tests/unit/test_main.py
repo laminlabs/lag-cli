@@ -34,8 +34,8 @@ def _stub_setup(monkeypatch) -> None:
 
 
 @pytest.fixture(autouse=True)
-def _bypass_lag_flow_wrapper(monkeypatch) -> None:
-    callback = lag.callback
+def _bypass_prompt_flow_wrapper(monkeypatch) -> None:
+    callback = lag.commands["prompt"].callback
     unwrapped_callback = callback
     while hasattr(unwrapped_callback, "__wrapped__"):
         unwrapped_callback = unwrapped_callback.__wrapped__
@@ -43,7 +43,7 @@ def _bypass_lag_flow_wrapper(monkeypatch) -> None:
     def _callback_without_flow(*args, **kwargs):
         return unwrapped_callback(*args, **kwargs)
 
-    monkeypatch.setattr(lag, "callback", _callback_without_flow)
+    monkeypatch.setattr(lag.commands["prompt"], "callback", _callback_without_flow)
 
 
 def test_parse_generated_paths_filters_empty_entries(tmp_path: Path) -> None:
@@ -128,11 +128,11 @@ def test_lag_setup_accepts_script_argument(tmp_path: Path, monkeypatch) -> None:
     assert called["script"] == script
 
 
-def test_lag_still_requires_prompt() -> None:
+def test_lag_prompt_requires_prompt_argument() -> None:
     runner = CliRunner()
-    result = runner.invoke(lag, [])
+    result = runner.invoke(lag, ["prompt"])
     assert result.exit_code != 0
-    assert "--prompt" in result.output
+    assert "Missing argument 'PROMPT'" in result.output
 
 
 def test_lag_default_mode_executes_prompt_path(monkeypatch) -> None:
@@ -148,7 +148,7 @@ def test_lag_default_mode_executes_prompt_path(monkeypatch) -> None:
 
     monkeypatch.setattr("laminagent._lag.execute_existing_from_prompt", _fake_execute)
     runner = CliRunner()
-    result = runner.invoke(lag, ["--prompt", "run test-lag/create_fasta.py"])
+    result = runner.invoke(lag, ["prompt", "run test-lag/create_fasta.py"])
 
     assert result.exit_code == 0
     clean_output = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
@@ -184,14 +184,14 @@ def test_lag_auto_authoring_runs_without_verbose_option(monkeypatch) -> None:
         "laminagent._lag._log_gemini_usage_record", lambda *_, **__: None
     )
     runner = CliRunner()
-    result = runner.invoke(lag, ["--prompt", "build tool"])
+    result = runner.invoke(lag, ["prompt", "build tool"])
 
     assert result.exit_code == 0
 
 
 def test_lag_rejects_less_verbose_flag() -> None:
     runner = CliRunner()
-    result = runner.invoke(lag, ["--less-verbose", "--prompt", "build tool"])
+    result = runner.invoke(lag, ["prompt", "--less-verbose", "build tool"])
 
     assert result.exit_code != 0
     assert "No such option" in result.output
@@ -216,7 +216,7 @@ def test_lag_auto_executes_discovered_tool_file(monkeypatch, tmp_path: Path) -> 
 
     monkeypatch.setattr("laminagent._lag.execute_the_tool", _fake_execute_the_tool)
     runner = CliRunner()
-    result = runner.invoke(lag, ["--prompt", "please run latest tool"])
+    result = runner.invoke(lag, ["prompt", "please run latest tool"])
 
     assert result.exit_code == 0
     assert called["prompt"] == "please run latest tool"
@@ -248,7 +248,7 @@ def test_trace_is_logged_with_redaction(monkeypatch) -> None:
 
     monkeypatch.setattr("laminagent._lag.execute_existing_from_prompt", _fake_execute)
     runner = CliRunner()
-    result = runner.invoke(lag, ["--prompt", "run test-lag/create_fasta.py"])
+    result = runner.invoke(lag, ["prompt", "run test-lag/create_fasta.py"])
 
     assert result.exit_code == 0
     assert logged
