@@ -89,16 +89,6 @@ def _extract_explicit_tool_keys(text: str) -> list[str]:
     return keys
 
 
-def _default_filename_for_tool(tool_name: str, default_output_file: Path) -> str:
-    suffix_by_tool = {
-        "write_python_script": ".py",
-    }
-    expected_suffix = suffix_by_tool.get(tool_name)
-    if expected_suffix is None:
-        return str(default_output_file)
-    return str(default_output_file.with_suffix(expected_suffix))
-
-
 def _post_generate_content(
     *,
     url: str,
@@ -170,7 +160,6 @@ def _dispatch_tool(
     name: str,
     args: dict[str, Any],
     run_context: RunContext,
-    default_output_file: Path,
     existing_generated_files: list[str],
     progress_callback: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
@@ -184,9 +173,13 @@ def _dispatch_tool(
         )
 
     if name == "write_python_script":
-        filename = str(
-            args.get("filename") or ""
-        ).strip() or _default_filename_for_tool(name, default_output_file)
+        filename = str(args.get("filename") or "").strip()
+        if not filename:
+            return {
+                "status": "error",
+                "message": "write_python_script requires a non-empty filename.",
+                "run_uid": run_context.run_uid,
+            }
         code = str(args.get("code", ""))
         explicit_keys = _extract_explicit_tool_keys(run_context.prompt)
         if len(explicit_keys) == 1 and filename != explicit_keys[0]:
@@ -235,7 +228,6 @@ def run_agent(
     *,
     api_key: str,
     run_context: RunContext,
-    output_file: Path,
     max_steps: int = 20,
     progress_callback: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
@@ -365,7 +357,6 @@ def run_agent(
                 name=name,
                 args=args,
                 run_context=run_context,
-                default_output_file=output_file,
                 existing_generated_files=generated_files,
                 progress_callback=tool_progress_callback,
             )

@@ -667,9 +667,6 @@ def run_agent_authoring(
     lamindb_run_uid = str(getattr(ln.context.run, "uid", "") or "") or None
     run_uid = create_run_uid(lamindb_run_uid)
 
-    suffix = "py"
-    output_path = Path(f"author_{run_uid}.{suffix}")
-
     run_context = RunContext(
         run_uid=run_uid,
         prompt=prompt,
@@ -682,7 +679,6 @@ def run_agent_authoring(
         result = run_agent(
             api_key=api_key,
             run_context=run_context,
-            output_file=output_path,
             progress_callback=progress_callback,
         )
     except Exception as exc:
