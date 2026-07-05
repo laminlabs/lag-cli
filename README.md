@@ -68,8 +68,6 @@ lag setup tests/tasks/test_01_create_fasta_for_favorite_protein.py
 
 - `--project <name>` sets `LAMIN_CURRENT_PROJECT`.
 - `--model <model-name>` selects the Gemini model during authoring.
-- `--output-file <path>` sets output filename for generated content during authoring.
-- `--no-track` disables `ln.track()` / `ln.finish()` injection in generated scripts.
 
 ## Run Context Propagation
 

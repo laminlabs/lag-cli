@@ -1,33 +1,21 @@
-from pathlib import Path
-
 from laminagent._agent import _dispatch_tool, _function_declarations, run_agent
 from laminagent._run_context import RunContext
 
 
-def test_defaults_python_extension_by_tool_type(monkeypatch) -> None:
+def test_write_python_script_requires_filename(monkeypatch) -> None:
     run_context = RunContext(
         run_uid="run-1",
         prompt="p",
         model="m",
     )
-    captured: dict[str, str] = {}
-
-    def _fake_write_python_script(**kwargs):
-        captured["filename"] = str(kwargs["filename"])
-        return {"status": "success", "file": str(kwargs["filename"])}
-
-    monkeypatch.setattr(
-        "laminagent._agent.write_python_script", _fake_write_python_script
-    )
-    _dispatch_tool(
+    result = _dispatch_tool(
         name="write_python_script",
         args={"code": "print('x')"},
         run_context=run_context,
-        default_output_file=Path("tool_run.md"),
         existing_generated_files=[],
     )
-    assert captured["filename"].endswith(".py")
-    assert captured["filename"] == "tool_run.py"
+    assert result["status"] == "error"
+    assert "requires a non-empty filename" in str(result["message"])
 
 
 def test_function_declarations_include_authoring_tools() -> None:
@@ -46,7 +34,6 @@ def test_enforces_explicit_key_filename_reuse() -> None:
         name="write_python_script",
         args={"filename": "create_fasta_albumin.py", "code": "print('x')"},
         run_context=run_context,
-        default_output_file=Path("analysis.py"),
         existing_generated_files=[],
     )
     assert result["status"] == "error"
@@ -63,7 +50,6 @@ def test_rejects_second_runnable_filename_in_same_run() -> None:
         name="write_python_script",
         args={"filename": "second.py", "code": "print('x')"},
         run_context=run_context,
-        default_output_file=Path("analysis.py"),
         existing_generated_files=["first.py"],
     )
     assert result["status"] == "error"
@@ -94,7 +80,6 @@ def test_dispatch_read_skill_from_lamindb_instance(monkeypatch) -> None:
         name="read_skill_from_lamindb_instance",
         args={"uid": "u5muNUOPnWPBuZ8z", "instance_slug": "laminlabs/biomed-skills"},
         run_context=run_context,
-        default_output_file=Path("analysis.py"),
         existing_generated_files=[],
     )
     assert result["status"] == "success"
@@ -124,7 +109,6 @@ def test_dispatch_read_skill_passes_empty_uid_through(monkeypatch) -> None:
         name="read_skill_from_lamindb_instance",
         args={},
         run_context=run_context,
-        default_output_file=Path("analysis.py"),
         existing_generated_files=[],
     )
     assert result["status"] == "success"
@@ -153,7 +137,6 @@ def test_run_agent_aggregates_usage_metadata(monkeypatch) -> None:
     result = run_agent(
         api_key="dummy",
         run_context=run_context,
-        output_file=Path("out.py"),
         max_steps=1,
     )
 
@@ -190,7 +173,6 @@ def test_run_agent_handles_missing_usage_metadata(monkeypatch) -> None:
     result = run_agent(
         api_key="dummy",
         run_context=run_context,
-        output_file=Path("out.py"),
         max_steps=1,
     )
 
@@ -248,7 +230,6 @@ def test_run_agent_stops_after_successful_write_python_script(monkeypatch) -> No
     result = run_agent(
         api_key="dummy",
         run_context=run_context,
-        output_file=Path("out.py"),
         max_steps=5,
     )
 
@@ -296,7 +277,6 @@ def test_run_agent_hard_fails_on_tool_error(monkeypatch) -> None:
         run_agent(
             api_key="dummy",
             run_context=run_context,
-            output_file=Path("out.py"),
             max_steps=5,
         )
     except RuntimeError as exc:
