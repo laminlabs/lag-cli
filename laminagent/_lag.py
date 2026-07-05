@@ -656,12 +656,15 @@ def run_agent_authoring(
     output_file: Path | None,
     model: str,
     track_outputs: bool,
+    gemini_api_key: str | None = None,
 ) -> dict[str, Any]:
     workspace_env_path = Path("~/llms.env").expanduser()
     load_dotenv(dotenv_path=workspace_env_path)
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = gemini_api_key or os.getenv("GEMINI_API_KEY")
     if not api_key:
-        raise click.ClickException("GEMINI_API_KEY not found in ~/llms.env")
+        raise click.ClickException(
+            "GEMINI_API_KEY not found via --gemini-api-key, environment, or ~/llms.env"
+        )
 
     lamindb_run_uid = str(getattr(ln.context.run, "uid", "") or "") or None
     run_uid = create_run_uid(lamindb_run_uid)
@@ -774,6 +777,12 @@ def execute_existing_from_prompt(prompt: str) -> dict[str, Any]:
     callback=_project_option_callback,
     help="Project name to set as LAMIN_CURRENT_PROJECT for the initiated run.",
 )
+@click.option(
+    "--gemini-api-key",
+    type=str,
+    default=None,
+    help="Temporary override for GEMINI_API_KEY.",
+)
 @ln.flow("wDJpT3xdqjY8")
 def lamin_executable_lag(
     prompt: str | None,
@@ -781,6 +790,7 @@ def lamin_executable_lag(
     model: str,
     no_track: bool,
     project: str | None,
+    gemini_api_key: str | None,
 ) -> None:
     """LAG CLI."""
     ctx = click.get_current_context()
@@ -843,6 +853,7 @@ def lamin_executable_lag(
         output_file=output_file,
         model=model,
         track_outputs=not no_track,
+        gemini_api_key=gemini_api_key,
     )
     gemini_usage = _normalize_gemini_usage(outcome.get("llm_usage"))
     _log_gemini_usage_to_run_features(gemini_usage)
