@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import os
 import re
-from typing import TYPE_CHECKING
+import tempfile
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from click.testing import CliRunner
@@ -17,10 +19,8 @@ from laminagent._lag import (
     _set_current_project_env,
     _warn_if_missing_project,
     lag,
+    run_agent_authoring,
 )
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 @pytest.fixture(autouse=True)
@@ -34,8 +34,8 @@ def _stub_setup(monkeypatch) -> None:
 
 
 @pytest.fixture(autouse=True)
-def _bypass_lag_flow_wrapper(monkeypatch) -> None:
-    callback = lag.callback
+def _bypass_prompt_flow_wrapper(monkeypatch) -> None:
+    callback = lag.commands["prompt"].callback
     unwrapped_callback = callback
     while hasattr(unwrapped_callback, "__wrapped__"):
         unwrapped_callback = unwrapped_callback.__wrapped__
@@ -43,7 +43,14 @@ def _bypass_lag_flow_wrapper(monkeypatch) -> None:
     def _callback_without_flow(*args, **kwargs):
         return unwrapped_callback(*args, **kwargs)
 
-    monkeypatch.setattr(lag, "callback", _callback_without_flow)
+    monkeypatch.setattr(lag.commands["prompt"], "callback", _callback_without_flow)
+
+    from laminagent import _lag as lag_module
+
+    flow_callback = lag_module.lamin_executable_prompt
+    while hasattr(flow_callback, "__wrapped__"):
+        flow_callback = flow_callback.__wrapped__
+    monkeypatch.setattr(lag_module, "lamin_executable_prompt", flow_callback)
 
 
 def test_parse_generated_paths_filters_empty_entries(tmp_path: Path) -> None:
@@ -128,11 +135,11 @@ def test_lag_setup_accepts_script_argument(tmp_path: Path, monkeypatch) -> None:
     assert called["script"] == script
 
 
-def test_lag_still_requires_prompt() -> None:
+def test_lag_prompt_requires_prompt_argument() -> None:
     runner = CliRunner()
-    result = runner.invoke(lag, [])
+    result = runner.invoke(lag, ["prompt"])
     assert result.exit_code != 0
-    assert "--prompt" in result.output
+    assert "Missing argument 'PROMPT'" in result.output
 
 
 def test_lag_default_mode_executes_prompt_path(monkeypatch) -> None:
@@ -148,7 +155,7 @@ def test_lag_default_mode_executes_prompt_path(monkeypatch) -> None:
 
     monkeypatch.setattr("laminagent._lag.execute_existing_from_prompt", _fake_execute)
     runner = CliRunner()
-    result = runner.invoke(lag, ["--prompt", "run test-lag/create_fasta.py"])
+    result = runner.invoke(lag, ["prompt", "run test-lag/create_fasta.py"])
 
     assert result.exit_code == 0
     clean_output = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
@@ -184,14 +191,69 @@ def test_lag_auto_authoring_runs_without_verbose_option(monkeypatch) -> None:
         "laminagent._lag._log_gemini_usage_record", lambda *_, **__: None
     )
     runner = CliRunner()
-    result = runner.invoke(lag, ["--prompt", "build tool"])
+    result = runner.invoke(lag, ["prompt", "build tool"])
 
     assert result.exit_code == 0
 
 
+def test_run_agent_authoring_uses_tmp_cwd_on_lambda(monkeypatch) -> None:
+    original_cwd = Path.cwd()
+    tmp_realpath = Path(tempfile.gettempdir()).resolve()
+    call_cwd: dict[str, str] = {}
+
+    def _fake_run_agent(**_kwargs):
+        call_cwd["value"] = str(Path.cwd().resolve())
+        return {
+            "generated_file": "generated.py",
+            "generated_files": ["generated.py"],
+            "resolved_runnable_path": "",
+            "final_text": "ok",
+            "llm_usage": {
+                "n_call_count": 0,
+                "n_prompt_tokens": 0,
+                "n_output_tokens": 0,
+                "n_total_tokens": 0,
+            },
+            "trace_events": [],
+        }
+
+    class _FakeTransform:
+        saved_paths: list[str] = []
+
+        def __init__(self, path: str) -> None:
+            self.path = path
+
+        def save(self):
+            _FakeTransform.saved_paths.append(self.path)
+            return self
+
+    monkeypatch.setattr("laminagent._lag.load_dotenv", lambda **_kwargs: None)
+    monkeypatch.setenv("AWS_LAMBDA_FUNCTION_NAME", "laminagent-test")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr("laminagent._lag.run_agent", _fake_run_agent)
+    monkeypatch.setattr(
+        "laminagent._lag.ln.context",
+        SimpleNamespace(run=None),
+    )
+    monkeypatch.setattr(
+        "laminagent._lag.ln.Transform",
+        SimpleNamespace(from_path=lambda path: _FakeTransform(path)),
+    )
+
+    outcome = run_agent_authoring(prompt="build tool", model="gemini-flash-latest")
+
+    assert call_cwd["value"] == str(tmp_realpath)
+    assert Path.cwd() == original_cwd
+    assert isinstance(outcome["generated_path"], str)
+    assert str(Path(str(outcome["generated_path"])).resolve()) == str(
+        Path(tmp_realpath) / "generated.py"
+    )
+    assert _FakeTransform.saved_paths == [str(outcome["generated_path"])]
+
+
 def test_lag_rejects_less_verbose_flag() -> None:
     runner = CliRunner()
-    result = runner.invoke(lag, ["--less-verbose", "--prompt", "build tool"])
+    result = runner.invoke(lag, ["prompt", "--less-verbose", "build tool"])
 
     assert result.exit_code != 0
     assert "No such option" in result.output
@@ -216,7 +278,7 @@ def test_lag_auto_executes_discovered_tool_file(monkeypatch, tmp_path: Path) -> 
 
     monkeypatch.setattr("laminagent._lag.execute_the_tool", _fake_execute_the_tool)
     runner = CliRunner()
-    result = runner.invoke(lag, ["--prompt", "please run latest tool"])
+    result = runner.invoke(lag, ["prompt", "please run latest tool"])
 
     assert result.exit_code == 0
     assert called["prompt"] == "please run latest tool"
@@ -248,7 +310,7 @@ def test_trace_is_logged_with_redaction(monkeypatch) -> None:
 
     monkeypatch.setattr("laminagent._lag.execute_existing_from_prompt", _fake_execute)
     runner = CliRunner()
-    result = runner.invoke(lag, ["--prompt", "run test-lag/create_fasta.py"])
+    result = runner.invoke(lag, ["prompt", "run test-lag/create_fasta.py"])
 
     assert result.exit_code == 0
     assert logged

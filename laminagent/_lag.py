@@ -4,6 +4,7 @@ import json
 import os
 import re
 import subprocess
+import tempfile
 import time
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -26,11 +27,10 @@ except ImportError:  # pragma: no cover - optional fallback
     Text = None  # type: ignore[assignment]
     _RICH_AVAILABLE = False
 
-from ._agent import run_agent
-from ._do_executor import execute_runnable_paths, execute_tool, find_tool_file
-from ._output_saver import save_generated_tool_files
-from ._run_context import RunContext, create_run_uid
-from ._setup import get_task, normalize_task_name, setup
+from laminagent._agent import run_agent
+from laminagent._do_executor import execute_runnable_paths, execute_tool, find_tool_file
+from laminagent._run_context import RunContext, create_run_uid
+from laminagent._setup import get_task, normalize_task_name, setup
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -45,6 +45,7 @@ _USAGE_FEATURES_NAMES = (
     "n_output_tokens",
     "n_total_tokens",
 )
+_LAMBDA_TMP_DIR = Path(tempfile.gettempdir())
 _TRACE_REDACT_KEYS = {
     "api_key",
     "apikey",
@@ -56,6 +57,20 @@ _TRACE_REDACT_KEYS = {
     "secret",
     "x-goog-api-key",
 }
+
+
+def _is_aws_lambda_runtime() -> bool:
+    return bool(os.getenv("AWS_LAMBDA_FUNCTION_NAME") or os.getenv("LAMBDA_TASK_ROOT"))
+
+
+def _resolve_writable_path(path: Path) -> Path:
+    if not _is_aws_lambda_runtime():
+        return path
+    if path.is_absolute():
+        if path == _LAMBDA_TMP_DIR or _LAMBDA_TMP_DIR in path.parents:
+            return path
+        return _LAMBDA_TMP_DIR / path.as_posix().lstrip("/")
+    return _LAMBDA_TMP_DIR / path
 
 
 def _secho(
@@ -467,7 +482,7 @@ def _materialize_transform_source(key: str) -> Path | None:
             f"Found transform '{key}' but no executable source code was available."
         )
 
-    output_path = Path(key).resolve()
+    output_path = _resolve_writable_path(Path(key)).resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(source_code, encoding="utf-8")
     return output_path
@@ -654,65 +669,90 @@ def _current_package_version() -> str:
 def run_agent_authoring(
     *,
     prompt: str,
-    output_file: Path | None,
     model: str,
-    track_outputs: bool,
+    gemini_api_key: str | None = None,
 ) -> dict[str, Any]:
     workspace_env_path = Path("~/llms.env").expanduser()
     load_dotenv(dotenv_path=workspace_env_path)
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = gemini_api_key or os.getenv("GEMINI_API_KEY")
     if not api_key:
-        raise click.ClickException("GEMINI_API_KEY not found in ~/llms.env")
+        raise click.ClickException(
+            "GEMINI_API_KEY not found via --gemini-api-key, environment, or ~/llms.env"
+        )
 
     lamindb_run_uid = str(getattr(ln.context.run, "uid", "") or "") or None
     run_uid = create_run_uid(lamindb_run_uid)
-
-    suffix = "py"
-    default_name = f"author_{run_uid}.{suffix}"
-    output_path = output_file or Path(default_name)
 
     run_context = RunContext(
         run_uid=run_uid,
         prompt=prompt,
         model=model,
-        track_outputs=track_outputs,
+        track_outputs=True,
     )
     start = time.perf_counter()
     progress_callback: Callable[[str], None] | None = _progress_verbose_live()
+    previous_cwd = Path.cwd()
+    if _is_aws_lambda_runtime():
+        _LAMBDA_TMP_DIR.mkdir(parents=True, exist_ok=True)
+        os.chdir(_LAMBDA_TMP_DIR)
     try:
-        result = run_agent(
-            api_key=api_key,
-            run_context=run_context,
-            output_file=output_path,
-            progress_callback=progress_callback,
-        )
-    except Exception as exc:
-        raise click.ClickException(str(exc)) from exc
-    elapsed = time.perf_counter() - start
+        try:
+            result = run_agent(
+                api_key=api_key,
+                run_context=run_context,
+                progress_callback=progress_callback,
+            )
+        except Exception as exc:
+            raise click.ClickException(str(exc)) from exc
+        elapsed = time.perf_counter() - start
+        active_cwd = Path.cwd()
 
-    generated_file = result.get("generated_file")
-    generated_files = [
-        path_str
-        for path_str in result.get("generated_files", [])
-        if isinstance(path_str, str) and path_str
-    ]
-    resolved_runnable_path = result.get("resolved_runnable_path")
-    if (
-        isinstance(resolved_runnable_path, str)
-        and resolved_runnable_path
-        and resolved_runnable_path not in generated_files
-    ):
-        generated_files.append(resolved_runnable_path)
-    save_generated_tool_files(generated_files)
-    return {
-        "run_uid": run_uid,
-        "generated_path": generated_file if isinstance(generated_file, str) else None,
-        "generated_paths": ",".join(generated_files),
-        "final_text": str(result.get("final_text", "") or "").strip(),
-        "llm_usage": _normalize_gemini_usage(result.get("llm_usage")),
-        "duration_in_sec": elapsed,
-        "trace_events": result.get("trace_events", []),
-    }
+        generated_path = result.get("generated_file")
+        generated_files: list[str] = []
+        for path_str in result.get("generated_files", []):
+            if not isinstance(path_str, str) or not path_str:
+                continue
+            candidate = Path(path_str)
+            normalized = str(
+                candidate.resolve()
+                if candidate.is_absolute()
+                else (active_cwd / candidate).resolve()
+            )
+            if normalized not in generated_files:
+                generated_files.append(normalized)
+        resolved_runnable_path = result.get("resolved_runnable_path")
+        if isinstance(resolved_runnable_path, str) and resolved_runnable_path:
+            candidate = Path(resolved_runnable_path)
+            resolved_normalized = str(
+                candidate.resolve()
+                if candidate.is_absolute()
+                else (active_cwd / candidate).resolve()
+            )
+            if resolved_normalized not in generated_files:
+                generated_files.append(resolved_normalized)
+        for generated_file in generated_files:
+            ln.Transform.from_path(generated_file).save()
+
+        generated_path_normalized = None
+        if isinstance(generated_path, str) and generated_path:
+            path_candidate = Path(generated_path)
+            generated_path_normalized = str(
+                path_candidate.resolve()
+                if path_candidate.is_absolute()
+                else (active_cwd / path_candidate).resolve()
+            )
+
+        return {
+            "run_uid": run_uid,
+            "generated_path": generated_path_normalized,
+            "generated_paths": ",".join(generated_files),
+            "final_text": str(result.get("final_text", "") or "").strip(),
+            "llm_usage": _normalize_gemini_usage(result.get("llm_usage")),
+            "duration_in_sec": elapsed,
+            "trace_events": result.get("trace_events", []),
+        }
+    finally:
+        os.chdir(previous_cwd)
 
 
 def execute_the_tool(
@@ -753,44 +793,24 @@ def execute_existing_from_prompt(prompt: str) -> dict[str, Any]:
     }
 
 
-@click.group(invoke_without_command=True)
-@click.option("--prompt", required=False, type=str, help="User prompt.")
-@click.option(
-    "--output-file",
-    type=click.Path(path_type=Path),
-    default=None,
-    help="Optional output filename when authoring a new script.",
-)
-@click.option("--model", type=str, default="gemini-flash-latest", show_default=True)
-@click.option(
-    "--no-track",
-    is_flag=True,
-    help="Disable automatic insertion of ln.track()/ln.finish() in generated scripts.",
-)
-@click.option(
-    "--project",
-    type=str,
-    default=None,
-    callback=_project_option_callback,
-    help="Project name to set as LAMIN_CURRENT_PROJECT for the initiated run.",
-)
-@ln.flow("wDJpT3xdqjY8")
-def lag(
-    prompt: str | None,
-    output_file: Path | None,
-    model: str,
-    no_track: bool,
-    project: str | None,
-) -> None:
+@click.group(name="lag")
+def lag() -> None:
     """LAG CLI."""
-    ctx = click.get_current_context()
-    if ctx.invoked_subcommand is not None:
-        return
 
-    if not prompt:
-        raise click.UsageError(
-            "`--prompt` is required for lag; use `lag setup` to initialize setup records."
-        )
+
+# Keep Lambda and CLI entrypoints separate:
+# - Lambda calls `lamin_executable_prompt(**function_kwargs)` directly.
+# - If Click decorators are attached to this function, it becomes a Click command
+#   object and Lambda invocation fails (e.g. unexpected keyword argument errors).
+# Do not move Click decorators back onto this function.
+@ln.flow("wDJpT3xdqjY8")
+def lamin_executable_prompt(
+    prompt: str,
+    model: str = "gemini-flash-latest",
+    project: str | None = None,
+    gemini_api_key: str | None = None,
+) -> None:
+    """Run prompt-driven LaminAgent execution."""
     prompt_text = prompt
 
     _warn_if_missing_project(project)
@@ -840,9 +860,8 @@ def lag(
 
     outcome = run_agent_authoring(
         prompt=prompt_text,
-        output_file=output_file,
         model=model,
-        track_outputs=not no_track,
+        gemini_api_key=gemini_api_key,
     )
     gemini_usage = _normalize_gemini_usage(outcome.get("llm_usage"))
     _log_gemini_usage_to_run_features(gemini_usage)
@@ -921,5 +940,5 @@ def run_codex(
     type=click.Path(path_type=Path, exists=True),
 )
 def setup_command(script: Path | None) -> None:
-    """Set up LagEval registry and schema."""
+    """Set up LaminAgentEvals registry and schema."""
     setup(script=script)

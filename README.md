@@ -23,30 +23,30 @@ Make sure LaminDB is initialized and connected.
 Run with auto flow:
 
 ```bash
-lag --prompt "Write a text file with 'Hello agent!' in it, please"
+lag prompt "Write a text file with 'Hello agent!' in it, please"
 ```
 
 You can explore runnable example scenarios in `tests/tasks`.
 
-Before running `lag`, you can initialize LagEval registry types manually:
+Before running `lag`, you can initialize LaminAgentEvals registry types manually:
 
 ```bash
 lag setup
 ```
 
-If these records are missing, `lag` still runs; run `lag setup` when you also want LagEval usage records.
+If these records are missing, `lag` still runs; run `lag setup` when you also want LaminAgentEvals usage records.
 
 ## Single Auto Flow
 
 `lag` decides behavior from prompt and local context:
 
-- If `--prompt` includes explicit runnable `.py` keys/paths, `lag` executes those scripts.
+- If `prompt` includes explicit runnable `.py` keys/paths, `lag` executes those scripts.
 - Otherwise, if `tool.md` (or latest `tool_*.md`) exists, `lag` executes scripts referenced there.
 - Otherwise, `lag` invokes LLM authoring to create/update a runnable `.py` script and saves it via `ln.Transform`.
 
 ### Setup mode (`setup`)
 
-Create or refresh LagEval record types used by `lag`:
+Create or refresh LaminAgentEvals record types used by `lag`:
 
 ```bash
 lag setup
@@ -55,7 +55,7 @@ lag setup
 When run from a repository root, this command:
 
 - creates or reuses schema `lag_eval`
-- creates or reuses top-level eval type `LagEval`
+- creates or reuses top-level eval type `LaminAgentEvals`
 - creates or reuses task types for `tests/tasks/*.py` (excluding `conftest.py` and `testutils.py`)
 
 You can also set up a single task script:
@@ -68,8 +68,6 @@ lag setup tests/tasks/test_01_create_fasta_for_favorite_protein.py
 
 - `--project <name>` sets `LAMIN_CURRENT_PROJECT`.
 - `--model <model-name>` selects the Gemini model during authoring.
-- `--output-file <path>` sets output filename for generated content during authoring.
-- `--no-track` disables `ln.track()` / `ln.finish()` injection in generated scripts.
 
 ## Run Context Propagation
 

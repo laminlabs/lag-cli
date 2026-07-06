@@ -19,7 +19,7 @@ def test_curate_mini_immuno() -> None:
         shutil.rmtree(RUN_DIR)
     RUN_DIR.mkdir(parents=True)
     # step 1: write the curation script
-    result = run_laminagent(RUN_DIR, "--prompt", PROMPT)
+    result = run_laminagent(RUN_DIR, "prompt", PROMPT)
     print(f"\n--- agent stdout ---\n{result.stdout}")
     assert result.returncode == 0, (
         f"lag failed\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
