@@ -31,24 +31,11 @@ def run_laminagent(run_dir: str, *args: str) -> subprocess.CompletedProcess[str]
         ) from exc
 
 
-def run_codex(
-    run_dir: str | Path,
-    prompt: str,
-    skill_uid: str | None = None,
-    skill_instance: str | None = None,
-) -> subprocess.CompletedProcess[str]:
+def run_codex(run_dir: str | Path, prompt: str) -> subprocess.CompletedProcess[str]:
     load_dotenv(dotenv_path=Path("~/llms.env").expanduser())
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        raise RuntimeError("OPENAI_API_KEY not set (add to ~/llms.env or as env var)")
-
-    if skill_uid and skill_instance:
-        import lamindb as ln
-
-        db = ln.DB(skill_instance)
-        skill_content = db.Artifact.get(skill_uid).cache().read_text()
-        prompt = f"{prompt}\n\n<skill>\n{skill_content}\n</skill>"
-
+        raise RuntimeError("OPENAI_API_KEY not found in ~/llms.env")
     env = {**os.environ, "OPENAI_API_KEY": api_key}
     command = ["codex", "exec", prompt, "--sandbox", "workspace-write"]
     try:
