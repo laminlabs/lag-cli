@@ -1,4 +1,8 @@
+import os
 import subprocess
+from pathlib import Path
+
+from dotenv import load_dotenv
 
 TESTDB1_NAME = "testdb1"
 TESTDB1_STORAGE = f"./{TESTDB1_NAME}-storage"
@@ -20,6 +24,33 @@ def run_laminagent(run_dir: str, *args: str) -> subprocess.CompletedProcess[str]
         stdout = (exc.stdout or "").strip()
         raise AssertionError(
             "lag CLI failed.\n"
+            f"command: {' '.join(command)}\n"
+            f"cwd: {run_dir}\n"
+            f"stdout:\n{stdout}\n"
+            f"stderr:\n{stderr}"
+        ) from exc
+
+
+def run_codex(run_dir: str | Path, prompt: str) -> subprocess.CompletedProcess[str]:
+    load_dotenv(dotenv_path=Path("~/llms.env").expanduser())
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY not found in ~/llms.env")
+    env = {**os.environ, "OPENAI_API_KEY": api_key}
+    command = ["codex", "exec", prompt, "--sandbox", "workspace-write"]
+    try:
+        return subprocess.run(
+            command,
+            cwd=str(run_dir),
+            text=True,
+            check=True,
+            env=env,
+        )
+    except subprocess.CalledProcessError as exc:
+        stderr = (exc.stderr or "").strip()
+        stdout = (exc.stdout or "").strip()
+        raise AssertionError(
+            "codex CLI failed.\n"
             f"command: {' '.join(command)}\n"
             f"cwd: {run_dir}\n"
             f"stdout:\n{stdout}\n"

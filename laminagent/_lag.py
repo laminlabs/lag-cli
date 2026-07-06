@@ -879,6 +879,41 @@ def lag(
         _secho(str(outcome["final_text"]), dim=True)
 
 
+@ln.flow("wDJpT3xdqjY8")
+def run_codex(
+    *,
+    prompt: str,
+    run_dir: Path,
+    sandbox: str = "workspace-write",
+) -> dict[str, Any]:
+    """Run the Codex CLI agent non-interactively and return the result."""
+    workspace_env_path = Path("~/llms.env").expanduser()
+    load_dotenv(dotenv_path=workspace_env_path)
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY not found in ~/llms.env")
+    lamindb_run_uid = str(getattr(ln.context.run, "uid", "") or "") or None
+    env = {**os.environ, "OPENAI_API_KEY": api_key}
+    if lamindb_run_uid:
+        env["LAMIN_INITIATED_BY_RUN_UID"] = lamindb_run_uid
+    command = ["codex", "exec", prompt, "--sandbox", sandbox]
+    result = subprocess.run(
+        command,
+        cwd=run_dir,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    return {
+        "returncode": result.returncode,
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+        "command": command,
+        "run_dir": str(run_dir),
+        "run_uid": lamindb_run_uid,
+    }
+
+
 @lag.command("setup")
 @click.argument(
     "script",
