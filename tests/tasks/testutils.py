@@ -40,7 +40,7 @@ def run_codex(
     load_dotenv(dotenv_path=Path("~/llms.env").expanduser())
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        raise RuntimeError("OPENAI_API_KEY not found in ~/llms.env")
+        raise RuntimeError("OPENAI_API_KEY not set (add to ~/llms.env or as env var)")
 
     if skill_uid and skill_instance:
         import lamindb as ln
