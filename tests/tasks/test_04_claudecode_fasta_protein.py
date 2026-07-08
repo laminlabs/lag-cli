@@ -15,7 +15,8 @@ RUN_DIR = Path(f"{TESTDB1_DEV_DIR}/test_04")
 def test_claudecode_fasta_protein_is_tracked() -> None:
     RUN_DIR.mkdir(parents=True, exist_ok=True)
 
-    run_claudecode(RUN_DIR, PROMPT, install_skill=True)
+    result = run_claudecode(RUN_DIR, PROMPT, install_skill=True)
+    print(f"\n--- claude stdout ---\n{result.stdout}")
 
     # tracking assertions — the actual regression test for the lamindb-track skill
     transform = ln.Transform.filter(key="__claudecode__").one_or_none()
