@@ -929,6 +929,53 @@ def prompt_command(
     )
 
 
+@ln.flow("cDxRNAseq0001")
+def run_codex(
+    *,
+    prompt: str,
+    run_dir: Path,
+    sandbox: str = "workspace-write",
+    skill_uid: str | None = None,
+    skill_instance: str | None = None,
+) -> dict[str, Any]:
+    """Run the Codex CLI agent non-interactively and return the result.
+
+    If skill_uid and skill_instance are provided, the skill content is fetched
+    from LaminDB and appended to the prompt.
+    """
+    workspace_env_path = Path("~/llms.env").expanduser()
+    load_dotenv(dotenv_path=workspace_env_path)
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY not set (add to ~/llms.env or as env var)")
+    lamindb_run_uid = str(getattr(ln.context.run, "uid", "") or "") or None
+
+    if skill_uid and skill_instance:
+        db = ln.DB(skill_instance)
+        skill_content = db.Artifact.get(skill_uid).cache().read_text()
+        prompt = f"{prompt}\n\n<skill>\n{skill_content}\n</skill>"
+
+    env = {**os.environ, "OPENAI_API_KEY": api_key}
+    if lamindb_run_uid:
+        env["LAMIN_INITIATED_BY_RUN_UID"] = lamindb_run_uid
+    command = ["codex", "exec", prompt, "--sandbox", sandbox]
+    result = subprocess.run(
+        command,
+        cwd=run_dir,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    return {
+        "returncode": result.returncode,
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+        "command": command,
+        "run_dir": str(run_dir),
+        "run_uid": lamindb_run_uid,
+    }
+
+
 @lag.command("setup")
 @click.argument(
     "script",

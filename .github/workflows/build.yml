@@ -13,6 +13,7 @@ jobs:
       GITHUB_EVENT_NAME: ${{ github.event_name }}
       GITHUB_TOKEN: ${{ secrets.LAMIN_BUILD_DOCS }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     strategy:
       fail-fast: false
       matrix:
@@ -32,8 +33,12 @@ jobs:
           key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
       - run: nox -s lint
       - run: uv pip install --system -e .[dev]
+      - if: matrix.group == 'tasks'
+        env:
+          LAMIN_API_KEY: ${{ secrets.LAMIN_API_KEY_TESTUSER1 }}
+        run: lamin login
       - if: github.event_name == 'push' && github.ref == 'refs/heads/main' && matrix.group == 'tasks'
         env:
           LAMIN_API_KEY: ${{ secrets.LAMIN_API_KEY_TESTUSER1 }}
-        run: lamin login && lamin connect laminlabs/lamindata
+        run: lamin connect laminlabs/lamindata
       - run: nox -s "test(group='${{ matrix.group }}')"
