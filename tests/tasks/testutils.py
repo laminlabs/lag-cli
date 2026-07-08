@@ -49,11 +49,8 @@ def run_codex(
         skill_content = db.Artifact.get(skill_uid).cache().read_text()
         prompt = f"{prompt}\n\n<skill>\n{skill_content}\n</skill>"
 
-    # GitHub Actions runners don't support bwrap (workspace-write sandbox uses it),
-    # so fall back to no sandbox on CI.
-    sandbox = "none" if os.getenv("CI") else "workspace-write"
     env = {**os.environ, "OPENAI_API_KEY": api_key}
-    command = ["codex", "exec", prompt, "--sandbox", sandbox]
+    command = ["codex", "exec", prompt, "--dangerously-bypass-approvals-and-sandbox"]
     try:
         return subprocess.run(
             command,
