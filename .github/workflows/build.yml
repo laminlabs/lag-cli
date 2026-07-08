@@ -13,6 +13,7 @@ jobs:
       GITHUB_EVENT_NAME: ${{ github.event_name }}
       GITHUB_TOKEN: ${{ secrets.LAMIN_BUILD_DOCS }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
     strategy:
       fail-fast: false
       matrix:

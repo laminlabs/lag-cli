@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 import lamindb as ln
-from testutils import TESTDB1_DEV_DIR, run_laminagent
+from testutils import TESTDB1_DEV_DIR, is_valid_fasta, run_laminagent
 
 EXAMPLE_UID = "RL6ZsKnHZvlhDg1d"
 
@@ -12,16 +12,6 @@ PROMPT = (
     "Write a Python script that writes your favorite protein sequence to a file called protein.fasta "
     "and saves it as a LaminDB artifact."
 )
-
-_VALID_AMINO_ACIDS = set("ACDEFGHIKLMNPQRSTVWYBZXJUO*-")
-
-
-def is_valid_fasta(text: str) -> bool:
-    lines = [l.strip() for l in text.splitlines() if l.strip()]
-    if not lines or not lines[0].startswith(">"):
-        return False
-    seq = "".join(l for l in lines if not l.startswith(">"))
-    return bool(seq) and all(c.upper() in _VALID_AMINO_ACIDS for c in seq)
 
 
 def test_create_favorite_protein_sequence() -> None:
