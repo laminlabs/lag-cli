@@ -39,7 +39,32 @@ def test_claudecode_fasta_protein_is_tracked() -> None:
         "of Transform, which destroys the lineage from script to output data)"
     )
 
+    script_run = (
+        ln.Run.filter(transform=script_transform).order_by("-created_at").first()
+    )
+    assert script_run is not None, (
+        "script's Transform exists but has no Run — the script was never executed "
+        "under ln.track(), so its ln.finish() never closed a run"
+    )
+    assert script_run.initiated_by_run_id == run.id, (
+        "script's Run is not linked back to the __claudecode__ agent run via "
+        "initiated_by_run — LAMIN_INITIATED_BY_RUN_UID was not set (or was set "
+        "incorrectly) when Claude Code executed the script, breaking the lineage "
+        "the skill's 'Self-tracking scripts' section promises"
+    )
+
     fasta_files = list(RUN_DIR.rglob("*.fasta"))
     assert fasta_files, "script ran but produced no .fasta file"
     for fasta in fasta_files:
         assert is_valid_fasta(fasta.read_text()), f"{fasta.name} is not valid FASTA"
+
+    fasta_artifact = ln.Artifact.filter(suffix=".fasta").order_by("-created_at").first()
+    assert fasta_artifact is not None, (
+        "protein.fasta was written to disk but never saved as a LaminDB Artifact — "
+        "the prompt explicitly asked for 'saves it as a LaminDB artifact'"
+    )
+    assert fasta_artifact.run_id == script_run.id, (
+        "protein.fasta Artifact exists but is not attached to the script's own "
+        "Run — expected it to auto-attach via the active ln.track() context, per "
+        "the skill's 'no run= needed, auto-attaches' convention"
+    )
