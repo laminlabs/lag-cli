@@ -38,10 +38,14 @@ def test_create_favorite_protein_sequence() -> None:
     ast.parse(code)
 
     # step 2: execute the script directly
-    subprocess.run(
+    script_result = subprocess.run(
         [sys.executable, script.name],
         cwd=TESTDB1_DEV_DIR,
-        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert script_result.returncode == 0, (
+        f"{script.name} failed\nSTDOUT:\n{script_result.stdout}\nSTDERR:\n{script_result.stderr}"
     )
 
     # step 3: check .fasta was produced and is valid
