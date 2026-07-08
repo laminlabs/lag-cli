@@ -1,3 +1,4 @@
+import ast
 import os
 import subprocess
 import tempfile
@@ -18,6 +19,27 @@ def is_valid_fasta(text: str) -> bool:
         return False
     seq = "".join(line for line in lines if not line.startswith(">"))
     return bool(seq) and all(c.upper() in _VALID_AMINO_ACIDS for c in seq)
+
+
+def assert_single_valid_script(run_dir: Path) -> Path:
+    """Assert exactly one .py file exists under run_dir and is valid Python; return it."""
+    scripts = list(run_dir.rglob("*.py"))
+    assert scripts, f"no .py file found under {run_dir}"
+    assert len(scripts) == 1, (
+        f"expected exactly one .py file under {run_dir}, found {len(scripts)}"
+    )
+    script = scripts[0]
+    ast.parse(script.read_text())
+    return script
+
+
+def assert_valid_fasta_outputs(run_dir: Path) -> list[Path]:
+    """Assert at least one .fasta file exists under run_dir and each is valid FASTA."""
+    fasta_files = list(run_dir.rglob("*.fasta"))
+    assert fasta_files, f"no .fasta file found under {run_dir}"
+    for fasta in fasta_files:
+        assert is_valid_fasta(fasta.read_text()), f"{fasta.name} is not valid FASTA"
+    return fasta_files
 
 
 def _run_cli(
