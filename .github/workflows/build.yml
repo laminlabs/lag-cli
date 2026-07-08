@@ -41,6 +41,4 @@ jobs:
         env:
           LAMIN_API_KEY: ${{ secrets.LAMIN_API_KEY_TESTUSER1 }}
         run: lamin connect laminlabs/lamindata
-      - if: matrix.group == 'tasks'
-        run: codex login --with-api-key <<< "$OPENAI_API_KEY"
       - run: nox -s "test(group='${{ matrix.group }}')"
