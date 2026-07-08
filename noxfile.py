@@ -25,6 +25,7 @@ def test(session: nox.Session, group: str) -> None:
     )  # point to "main" for PRs, to "release" for main
     install_lamindb(session, branch=branch)
     if group == "tasks":
+        session.run("npm", "install", "-g", "@openai/codex", external=True)
         coverage_args = []
     else:
         coverage_args = [
