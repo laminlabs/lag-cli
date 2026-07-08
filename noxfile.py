@@ -28,10 +28,12 @@ def test(session: nox.Session, group: str) -> None:
         session.run("npm", "install", "-g", "@openai/codex", external=True)
         if os.environ.get("OPENAI_API_KEY"):
             session.run(
-                "bash", "-c",
+                "bash",
+                "-c",
                 'codex login --with-api-key <<< "$OPENAI_API_KEY"',
                 external=True,
             )
+
         coverage_args = []
     else:
         coverage_args = [
