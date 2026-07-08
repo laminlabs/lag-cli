@@ -60,7 +60,16 @@ def _install_lamindb_track_skill(run_dir: Path) -> None:
     """
     with tempfile.TemporaryDirectory() as tmp:
         _run_cli(
-            ["npx", "--yes", "skills", "add", "laminlabs/lamin-skills", "--agent", "claude-code", "-y"],
+            [
+                "npx",
+                "--yes",
+                "skills",
+                "add",
+                "laminlabs/lamin-skills",
+                "--agent",
+                "claude-code",
+                "-y",
+            ],
             cwd=tmp,
         )
         content = Path(
