@@ -25,6 +25,27 @@ def test(session: nox.Session, group: str) -> None:
     )  # point to "main" for PRs, to "release" for main
     install_lamindb(session, branch=branch)
     if group == "tasks":
+        session.run("npm", "install", "-g", "@openai/codex", external=True)
+        if os.environ.get("OPENAI_API_KEY"):
+            session.run(
+                "bash",
+                "-c",
+                'codex login --with-api-key <<< "$OPENAI_API_KEY"',
+                external=True,
+            )
+        session.run(
+            "uv",
+            "pip",
+            "install",
+            "--system",
+            "matplotlib",
+            "seaborn",
+            "pandas",
+            "numpy",
+            "openpyxl",
+            "requests",
+            external=True,
+        )
         session.run("npm", "install", "-g", "@anthropic-ai/claude-code", external=True)
         # ANTHROPIC_API_KEY in the environment is sufficient auth for headless mode —
         # unlike codex, no separate non-interactive login step is needed.
