@@ -46,6 +46,10 @@ def test(session: nox.Session, group: str) -> None:
             "requests",
             external=True,
         )
+        session.run("npm", "install", "-g", "@anthropic-ai/claude-code", external=True)
+        # ANTHROPIC_API_KEY in the environment is sufficient auth for headless mode —
+        # unlike codex, no separate non-interactive login step is needed.
+
         coverage_args = []
     else:
         coverage_args = [
