@@ -34,9 +34,23 @@ RUN_DIR = Path(f"{TESTDB1_DEV_DIR}/test_04")
 
 # 17-column DRAGEN CNV schema, matching the real *.cnv.parquet files.
 _COLUMNS = [
-    "CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "FORMAT",
-    "INFO_REFLEN", "SAMPLE_GT", "SAMPLE_SM", "SAMPLE_CN", "SAMPLE_BC",
-    "SAMPLE_PE", "SAMPLE_NAME", "INFO_SVLEN", "INFO_SVTYPE",
+    "CHROM",
+    "POS",
+    "ID",
+    "REF",
+    "ALT",
+    "QUAL",
+    "FILTER",
+    "FORMAT",
+    "INFO_REFLEN",
+    "SAMPLE_GT",
+    "SAMPLE_SM",
+    "SAMPLE_CN",
+    "SAMPLE_BC",
+    "SAMPLE_PE",
+    "SAMPLE_NAME",
+    "INFO_SVLEN",
+    "INFO_SVTYPE",
 ]
 
 
@@ -91,28 +105,44 @@ def _write_fixture(data_root: Path) -> int:
             # chr1 REF / no-call row — not a variant, must be excluded
             rows.append(
                 _cnv_row(
-                    "chr1", pos + 100, f"DRAGEN:REF:chr1:{j}", sample,
-                    svtype=None, alt=".",
+                    "chr1",
+                    pos + 100,
+                    f"DRAGEN:REF:chr1:{j}",
+                    sample,
+                    svtype=None,
+                    alt=".",
                 )
             )
             # chr2 CNV — wrong chromosome, must be excluded
             rows.append(
                 _cnv_row(
-                    "chr2", pos, f"DRAGEN:LOSS:chr2:{j}", sample,
-                    svtype="CNV", alt="<DEL>",
+                    "chr2",
+                    pos,
+                    f"DRAGEN:LOSS:chr2:{j}",
+                    sample,
+                    svtype="CNV",
+                    alt="<DEL>",
                 )
             )
             # chr10 / chr11 CNV — "chr1"-substring trap, must be excluded
             rows.append(
                 _cnv_row(
-                    "chr10", pos, f"DRAGEN:LOSS:chr10:{j}", sample,
-                    svtype="CNV", alt="<DEL>",
+                    "chr10",
+                    pos,
+                    f"DRAGEN:LOSS:chr10:{j}",
+                    sample,
+                    svtype="CNV",
+                    alt="<DEL>",
                 )
             )
             rows.append(
                 _cnv_row(
-                    "chr11", pos, f"DRAGEN:GAIN:chr11:{j}", sample,
-                    svtype="CNV", alt="<DUP>",
+                    "chr11",
+                    pos,
+                    f"DRAGEN:GAIN:chr11:{j}",
+                    sample,
+                    svtype="CNV",
+                    alt="<DUP>",
                 )
             )
         sample_dir = data_root / sample
