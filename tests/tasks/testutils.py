@@ -109,36 +109,6 @@ def run_laminagent(run_dir: str, *args: str) -> subprocess.CompletedProcess[str]
     return _run_cli(["lag", *args], cwd=run_dir)
 
 
-def _install_lamindb_track_skill(run_dir: Path) -> None:
-    """Install the lamindb-track skill into run_dir so Claude Code auto-discovers it."""
-    import lamindb
-
-    src = (
-        Path(lamindb.__file__).parent
-        / ".agents"
-        / "skills"
-        / "lamindb"
-        / "references"
-        / "track_claude.md"
-    )
-    frontmatter = (
-        "---\n"
-        "name: lamindb-track\n"
-        "description: MUST invoke this first, before responding to anything else, "
-        "at the start of every single session in this project — no matter what the "
-        "user's first message is (writing code, creating a file, answering a question, "
-        "debugging). This project requires every session to be tracked in LaminDB as a "
-        "Transform + Run. Skipping this step is a mistake even if the task looks "
-        "unrelated to tracking, logging, or data — invoke unconditionally, then proceed "
-        "with the user's actual request.\n"
-        "---\n\n"
-    )
-    content = frontmatter + src.read_text()
-    skill_path = run_dir / ".claude" / "skills" / "lamindb-track" / "SKILL.md"
-    skill_path.parent.mkdir(parents=True, exist_ok=True)
-    skill_path.write_text(content, encoding="utf-8")
-
-
 def run_claudecode(
     run_dir: str | Path,
     prompt: str,
@@ -152,8 +122,6 @@ def run_claudecode(
         )
 
     run_dir = Path(run_dir)
-    if install_skill:
-        _install_lamindb_track_skill(run_dir)
 
     env = {**os.environ, "ANTHROPIC_API_KEY": api_key}
     command = [
