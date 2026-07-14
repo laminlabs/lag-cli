@@ -123,14 +123,6 @@ def run_claudecode(
 
     run_dir = Path(run_dir)
 
-    import lamindb
-
-    agents_skill = Path(lamindb.__file__).parent / ".agents" / "skills" / "lamindb"
-    print(
-        f"\n--- .agents/skills/lamindb in lamindb package: {agents_skill.exists()} ---"
-    )
-    print(f"--- path: {agents_skill} ---")
-
     env = {**os.environ, "ANTHROPIC_API_KEY": api_key}
     command = [
         "claude",
