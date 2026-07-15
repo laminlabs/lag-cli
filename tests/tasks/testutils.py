@@ -109,6 +109,18 @@ def run_laminagent(run_dir: str, *args: str) -> subprocess.CompletedProcess[str]
     return _run_cli(["lag", *args], cwd=run_dir)
 
 
+def _install_lamindb_skill(run_dir: Path) -> None:
+    """Copy the lamindb skill from the installed package to run_dir/.claude/skills/."""
+    import shutil
+
+    import lamindb
+
+    src = Path(lamindb.__file__).parent / ".agents" / "skills" / "lamindb"
+    dst = run_dir / ".claude" / "skills" / "lamindb"
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(src, dst)
+
+
 def run_claudecode(
     run_dir: str | Path,
     prompt: str,
@@ -122,6 +134,8 @@ def run_claudecode(
         )
 
     run_dir = Path(run_dir)
+    if install_skill:
+        _install_lamindb_skill(run_dir)
 
     env = {**os.environ, "ANTHROPIC_API_KEY": api_key}
     command = [
