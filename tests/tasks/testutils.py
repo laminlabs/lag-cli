@@ -1,7 +1,6 @@
 import ast
 import os
 import subprocess
-import tempfile
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -110,37 +109,16 @@ def run_laminagent(run_dir: str, *args: str) -> subprocess.CompletedProcess[str]
     return _run_cli(["lag", *args], cwd=run_dir)
 
 
-def _install_lamindb_track_skill(run_dir: Path) -> None:
-    """Install the lamindb-track skill into run_dir so Claude Code auto-discovers it.
+def _install_lamindb_skill(run_dir: Path) -> None:
+    """Copy the lamindb skill from the installed package to run_dir/.claude/skills/."""
+    import shutil
 
-    trace_agents.md in laminlabs/lamin-skills is already a complete, standalone
-    skill file (frontmatter included, name: lamindb-track) — it just ships nested
-    under the generic lamindb skill's references/, which Claude Code's discovery
-    (.claude/skills/<name>/SKILL.md) won't scan into on its own. Fetch the official
-    package via its documented installer, then copy that one file to its own
-    top-level skill path.
-    """
-    with tempfile.TemporaryDirectory() as tmp:
-        _run_cli(
-            [
-                "npx",
-                "--yes",
-                "skills",
-                "add",
-                "laminlabs/lamin-skills",
-                "--agent",
-                "claude-code",
-                "-y",
-            ],
-            cwd=tmp,
-        )
-        content = Path(
-            tmp, ".claude", "skills", "lamindb", "references", "trace_agents.md"
-        ).read_text()
+    import lamindb
 
-    skill_path = run_dir / ".claude" / "skills" / "lamindb-track" / "SKILL.md"
-    skill_path.parent.mkdir(parents=True, exist_ok=True)
-    skill_path.write_text(content, encoding="utf-8")
+    src = Path(lamindb.__file__).parent / ".agents" / "skills" / "lamindb"
+    dst = run_dir / ".claude" / "skills" / "lamindb"
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(src, dst)
 
 
 def run_claudecode(
@@ -157,7 +135,7 @@ def run_claudecode(
 
     run_dir = Path(run_dir)
     if install_skill:
-        _install_lamindb_track_skill(run_dir)
+        _install_lamindb_skill(run_dir)
 
     env = {**os.environ, "ANTHROPIC_API_KEY": api_key}
     command = [
