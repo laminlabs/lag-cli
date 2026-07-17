@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main, staging]
+  repository_dispatch:
+    types: [build]
 
 jobs:
   test:
