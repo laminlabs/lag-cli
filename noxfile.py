@@ -21,7 +21,7 @@ def lint(session: nox.Session) -> None:
 @nox.parametrize("group", ["unit", "tasks"])
 def test(session: nox.Session, group: str) -> None:
     branch = (
-        "parallelclaudecode" if IS_PR else "parallelclaudecode"
+        "main" if IS_PR else "main"
     )  # point to "main" for PRs, to "release" for main
     install_lamindb(session, branch=branch)
     if group == "tasks":
