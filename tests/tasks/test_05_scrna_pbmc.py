@@ -5,12 +5,14 @@ import scanpy as sc
 from testutils import TESTDB1_DEV_DIR, run_claudecode
 
 PROMPT = (
+    "Yes, track this session in LaminDB. "
     "Write a Python script called scrna_pbmc3k.py that loads the PBMC3k dataset "
     "from pbmc3k_raw.h5ad in the current directory and runs a standard single-cell "
     "RNA-seq analysis on it: QC filtering (including mitochondrial content), "
     "normalization, clustering, and UMAP visualization. Save the UMAP as umap.png, "
     "save the processed data as pbmc3k_processed.h5ad, and register it as a LaminDB "
-    "artifact with the key 'scrna/pbmc3k_processed.h5ad'. Then run the script."
+    "artifact with the key 'scrna/pbmc3k_processed.h5ad'. Then run the script. "
+    "Do not ask any questions — if unsure about any parameter, make a reasonable assumption and proceed."
 )
 RUN_DIR = Path(f"{TESTDB1_DEV_DIR}/test_05")
 
