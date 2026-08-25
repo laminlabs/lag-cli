@@ -31,7 +31,9 @@ def test_scrna_pbmc3k() -> None:
     assert transform is not None, "skill never created the __claudecode__ transform"
     run = ln.Run.filter(transform=transform).order_by("-created_at").first()
     assert run is not None, "no Run found for the __claudecode__ transform"
-    assert run.finished_at is not None, "skill did not close the run (ln.finish() was not called)"
+    assert run.finished_at is not None, (
+        "skill did not close the run (ln.finish() was not called)"
+    )
 
     # the generated script's run must be linked via initiated_by_run
     script_run = ln.Run.filter(initiated_by_run=run).order_by("-created_at").first()
