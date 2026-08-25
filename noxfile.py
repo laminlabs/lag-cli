@@ -44,6 +44,9 @@ def test(session: nox.Session, group: str) -> None:
             "numpy",
             "openpyxl",
             "requests",
+            "scanpy",
+            "anndata",
+            "leidenalg",
             external=True,
         )
         session.run("npm", "install", "-g", "@anthropic-ai/claude-code", external=True)
