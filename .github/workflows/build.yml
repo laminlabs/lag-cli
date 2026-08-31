@@ -17,11 +17,12 @@ jobs:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      LAMIN_COPILOT_TOKEN: ${{ secrets.LAMIN_COPILOT_TOKEN }}
     strategy:
       fail-fast: false
       matrix:
         group: [unit, tasks]
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
