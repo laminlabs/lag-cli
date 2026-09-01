@@ -19,8 +19,10 @@ LAMINAGENT_PROMPT = (
     "and saves it as a LaminDB artifact."
 )
 CLAUDECODE_PROMPT = (
-    "Write a Python script that writes your favorite protein sequence to a file "
-    "called protein.fasta and saves it as a LaminDB artifact. Then run the script."
+    "Don't ask for confirmations, track the session. "
+    "Write a Python script called save_protein.py in the current directory "
+    "that writes your favorite protein sequence to a file called protein.fasta "
+    "and saves it as a LaminDB artifact. Then run the script."
 )
 
 
