@@ -23,7 +23,12 @@ CLAUDECODE_PROMPT = (
     "Write a Python script that writes your favorite protein sequence to a file "
     "called protein.fasta and saves it as a LaminDB artifact. Then run the script."
 )
-COPILOT_PROMPT = CLAUDECODE_PROMPT
+COPILOT_PROMPT = (
+    "Follow the installed LaminDB skill exactly. Before doing any work or running "
+    "any command, ask whether this session should be tracked in LaminDB, then stop "
+    "and wait for my answer. After I answer, continue with this task: "
+    f"{CLAUDECODE_PROMPT}"
+)
 
 
 def _run_and_verify_laminagent(run_dir: Path) -> None:
