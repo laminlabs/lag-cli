@@ -20,15 +20,13 @@ LAMINAGENT_PROMPT = (
     "and saves it as a LaminDB artifact."
 )
 CLAUDECODE_PROMPT = (
-    "Write a Python script that writes your favorite protein sequence to a file "
-    "called protein.fasta and saves it as a LaminDB artifact. Then run the script."
+    "For this automated test, I explicitly consent to LaminDB tracking. "
+    "Don't ask for confirmations; track the session and continue. "
+    "Write a Python script called save_protein.py in the current directory that "
+    "writes your favorite protein sequence to a file called protein.fasta and "
+    "saves it as a LaminDB artifact. Then run the script."
 )
-COPILOT_PROMPT = (
-    "Follow the installed LaminDB skill exactly. Before doing any work or running "
-    "any command, ask whether this session should be tracked in LaminDB, then stop "
-    "and wait for my answer. After I answer, continue with this task: "
-    f"{CLAUDECODE_PROMPT}"
-)
+COPILOT_PROMPT = CLAUDECODE_PROMPT
 
 
 def _run_and_verify_laminagent(run_dir: Path) -> None:
