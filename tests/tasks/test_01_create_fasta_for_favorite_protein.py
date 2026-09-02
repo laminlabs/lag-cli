@@ -104,7 +104,12 @@ def _verify_agent_tracking(run_dir: Path, transform_key: str) -> None:
 
 
 def _run_and_verify_claudecode(run_dir: Path) -> None:
-    result = run_claudecode(run_dir, CLAUDECODE_PROMPT, install_skill=True)
+    previous_dev_dir = ln.setup.settings.dev_dir
+    ln.setup.settings.dev_dir = run_dir
+    try:
+        result = run_claudecode(run_dir, CLAUDECODE_PROMPT, install_skill=True)
+    finally:
+        ln.setup.settings.dev_dir = previous_dev_dir
     print(f"\n--- claude stdout ---\n{result.stdout}")
     _verify_agent_tracking(run_dir, "__claudecode__")
 
