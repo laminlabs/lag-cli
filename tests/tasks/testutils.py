@@ -211,6 +211,10 @@ def run_copilot(
     session_id = str(uuid4())
     common_args = [
         "--allow-all",
+        # CI has no interactive terminal. Disabling the ask-user tool makes
+        # Copilot return the consent question as its first textual turn so the
+        # harness can assert it and answer through --resume.
+        "--no-ask-user",
         "--secret-env-vars=LAMIN_COPILOT_TOKEN,COPILOT_GITHUB_TOKEN,GITHUB_TOKEN",
     ]
     initial = _run_cli(
