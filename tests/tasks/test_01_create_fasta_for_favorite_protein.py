@@ -105,7 +105,12 @@ def _run_and_verify_claudecode(run_dir: Path) -> None:
 
 
 def _run_and_verify_copilot(run_dir: Path) -> None:
-    result = run_copilot(run_dir, COPILOT_PROMPT, install_skill=True)
+    previous_dev_dir = ln.setup.settings.dev_dir
+    ln.setup.settings.dev_dir = run_dir
+    try:
+        result = run_copilot(run_dir, COPILOT_PROMPT, install_skill=True)
+    finally:
+        ln.setup.settings.dev_dir = previous_dev_dir
     print(f"\n--- copilot stdout ---\n{result.stdout}")
     _verify_agent_tracking(run_dir, "__copilot__")
 
