@@ -1,7 +1,9 @@
 import ast
+import json
 import os
 import subprocess
 from pathlib import Path
+from uuid import uuid4
 
 from dotenv import load_dotenv
 
@@ -10,6 +12,7 @@ TESTDB1_STORAGE = f"./{TESTDB1_NAME}-storage"
 TESTDB1_DEV_DIR = f"./{TESTDB1_NAME}-dev-dir"
 
 _VALID_AMINO_ACIDS = set("ACDEFGHIKLMNPQRSTVWYBZXJUO*-")
+_TRACKING_QUESTION = "should this session be tracked in lamindb"
 
 
 def is_valid_fasta(text: str) -> bool:
@@ -63,6 +66,15 @@ def _run_cli(
             f"stdout:\n{stdout}\n"
             f"stderr:\n{stderr}"
         ) from exc
+
+
+def _assert_tracking_consent_requested(
+    result: subprocess.CompletedProcess[str], agent: str
+) -> None:
+    assert _TRACKING_QUESTION in result.stdout.lower(), (
+        f"{agent} did not ask whether the session should be tracked before "
+        f"starting the task.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+    )
 
 
 def run_codex(
@@ -138,10 +150,33 @@ def run_claudecode(
         _install_lamindb_skill(run_dir, Path(".claude/skills"))
 
     env = {**os.environ, "ANTHROPIC_API_KEY": api_key}
+    initial = _run_cli(
+        [
+            "claude",
+            "-p",
+            prompt,
+            "--output-format",
+            "json",
+            "--permission-mode",
+            "bypassPermissions",
+        ],
+        cwd=str(run_dir),
+        env=env,
+    )
+    _assert_tracking_consent_requested(initial, "Claude Code")
+    try:
+        session_id = json.loads(initial.stdout)["session_id"]
+    except (json.JSONDecodeError, KeyError, TypeError) as exc:
+        raise AssertionError(
+            f"Claude Code did not return a resumable session ID:\n{initial.stdout}"
+        ) from exc
+
     command = [
         "claude",
         "-p",
-        prompt,
+        "yes",
+        "--resume",
+        session_id,
         "--output-format",
         "json",
         "--permission-mode",
@@ -173,12 +208,23 @@ def run_copilot(
         "COPILOT_GITHUB_TOKEN": token,
         "COPILOT_AUTO_UPDATE": "false",
     }
+    session_id = str(uuid4())
+    common_args = [
+        "--allow-all",
+        "--secret-env-vars=LAMIN_COPILOT_TOKEN,COPILOT_GITHUB_TOKEN,GITHUB_TOKEN",
+    ]
+    initial = _run_cli(
+        ["copilot", "-p", prompt, "--session-id", session_id, *common_args],
+        cwd=str(run_dir),
+        env=env,
+    )
+    _assert_tracking_consent_requested(initial, "Copilot")
+
     command = [
         "copilot",
         "-p",
-        prompt,
-        "--allow-all",
-        "--no-ask-user",
-        "--secret-env-vars=LAMIN_COPILOT_TOKEN,COPILOT_GITHUB_TOKEN,GITHUB_TOKEN",
+        "yes",
+        f"--resume={session_id}",
+        *common_args,
     ]
     return _run_cli(command, cwd=str(run_dir), env=env)
