@@ -22,7 +22,7 @@ jobs:
       fail-fast: false
       matrix:
         group: [unit, tasks]
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
